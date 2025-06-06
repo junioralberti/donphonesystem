@@ -1,19 +1,4 @@
-
-import {
-  collection,
-  addDoc,
-  getDocs,
-  doc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  query,
-  orderBy,
-  Timestamp,
-  type DocumentData,
-  type QueryDocumentSnapshot,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 export type ServiceOrderStatus = "Aberta" | "Em andamento" | "Aguardando peça" | "Concluída" | "Entregue" | "Cancelada";
 export type DeviceType = "Celular" | "Notebook" | "Tablet" | "Placa" | "Outro";
@@ -49,90 +34,89 @@ export interface ServiceOrderInput {
 }
 
 export interface ServiceOrder extends ServiceOrderInput {
-  id: string; // Firestore ID
+  id: string;
   osNumber: string;
-  openingDate: Date | Timestamp; // Firestore Timestamp ou Date object
-  updatedAt?: Date | Timestamp;
+  openingDate: Date;
+  updatedAt?: Date;
 }
 
-const SERVICE_ORDERS_COLLECTION = 'serviceOrders';
+const SERVICE_ORDERS_TABLE = 'serviceOrders';
 
-const serviceOrderFromDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): ServiceOrder => {
-  const data = docSnap.data();
-  return {
-    id: docSnap.id,
-    osNumber: data.osNumber || `OS-${docSnap.id.substring(0,6).toUpperCase()}`,
-    deliveryForecastDate: data.deliveryForecastDate || null,
-    status: data.status || "Aberta",
-    responsibleTechnicianName: data.responsibleTechnicianName || null,
-    clientName: data.clientName || '',
-    clientCpfCnpj: data.clientCpfCnpj || null,
-    clientPhone: data.clientPhone || null,
-    clientEmail: data.clientEmail || null,
-    deviceType: data.deviceType || null,
-    deviceBrandModel: data.deviceBrandModel || '',
-    deviceImeiSerial: data.deviceImeiSerial || null,
-    deviceColor: data.deviceColor || null,
-    deviceAccessories: data.deviceAccessories || null,
-    problemReportedByClient: data.problemReportedByClient || '',
-    technicalDiagnosis: data.technicalDiagnosis || null,
-    internalObservations: data.internalObservations || null,
-    servicesPerformedDescription: data.servicesPerformedDescription || null,
-    partsUsedDescription: data.partsUsedDescription || null,
-    serviceManualValue: data.serviceManualValue || 0,
-    additionalSoldProducts: data.additionalSoldProducts || [],
-    grandTotalValue: data.grandTotalValue || 0,
-    openingDate: (data.openingDate as Timestamp)?.toDate() || new Date(),
-    updatedAt: (data.updatedAt as Timestamp)?.toDate(),
-  };
-};
-
-// Função para gerar um número de OS simples.
-// Em um sistema real, isso poderia ser mais robusto (ex: contador no Firestore com transações).
 const generateOsNumber = async (): Promise<string> => {
-    // Exemplo: OS-ANO-MES-SEQUENCIAL SIMPLES (baseado no timestamp para unicidade)
-    const now = new Date();
-    const year = now.getFullYear().toString().slice(-2);
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    // Usar os últimos 6 dígitos do timestamp para uma pseudo-sequência
-    const sequence = Date.now().toString().slice(-6); 
-    return `OS-${year}${month}-${sequence}`;
+  const now = new Date();
+  const year = now.getFullYear().toString().slice(-2);
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  const sequence = Date.now().toString().slice(-6);
+  return `OS-${year}${month}-${sequence}`;
 };
-
 
 export const addServiceOrder = async (orderData: ServiceOrderInput): Promise<string> => {
   const osNumber = await generateOsNumber();
-  const docRef = await addDoc(collection(db, SERVICE_ORDERS_COLLECTION), {
-    ...orderData,
-    osNumber: osNumber,
-    openingDate: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  // O componente service-orders/page.tsx espera o novo número da OS
-  return osNumber; 
+  const { data, error } = await supabase
+    .from(SERVICE_ORDERS_TABLE)
+    .insert({
+      ...orderData,
+      osNumber,
+      openingDate: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Erro ao adicionar ordem de serviço:', error);
+    throw new Error('Erro ao adicionar ordem de serviço');
+  }
+
+  return osNumber;
 };
 
 export const getServiceOrders = async (): Promise<ServiceOrder[]> => {
-  const q = query(collection(db, SERVICE_ORDERS_COLLECTION), orderBy('openingDate', 'desc'));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(serviceOrderFromDoc);
+  const { data, error } = await supabase
+    .from(SERVICE_ORDERS_TABLE)
+    .select('*')
+    .order('openingDate', { ascending: false });
+
+  if (error) {
+    console.error('Erro ao buscar ordens de serviço:', error);
+    throw new Error('Erro ao buscar ordens de serviço');
+  }
+
+  return data.map((order: any) => ({
+    ...order,
+    openingDate: order.openingDate ? new Date(order.openingDate) : new Date(),
+    updatedAt: order.updatedAt ? new Date(order.updatedAt) : undefined,
+  }));
 };
 
-export const updateServiceOrder = async (id: string, orderData: Partial<Omit<ServiceOrder, 'id' | 'osNumber' | 'openingDate'>>): Promise<void> => {
-  const orderRef = doc(db, SERVICE_ORDERS_COLLECTION, id);
-  await updateDoc(orderRef, {
-    ...orderData,
-    updatedAt: serverTimestamp(),
-  });
+export const updateServiceOrder = async (
+  id: string,
+  orderData: Partial<Omit<ServiceOrder, 'id' | 'osNumber' | 'openingDate'>>
+): Promise<void> => {
+  const { error } = await supabase
+    .from(SERVICE_ORDERS_TABLE)
+    .update({
+      ...orderData,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', id);
+
+  if (error) {
+    console.error('Erro ao atualizar ordem de serviço:', error);
+    throw new Error('Erro ao atualizar ordem de serviço');
+  }
 };
 
 export const deleteServiceOrder = async (id: string): Promise<string> => {
-  const orderRef = doc(db, SERVICE_ORDERS_COLLECTION, id);
-  // Para consistência com o callback da mutação que espera o ID da OS (que no caso é o osNumber)
-  // Precisamos pegar o osNumber ANTES de deletar, ou apenas retornar o ID do documento,
-  // e ajustar o componente para esperar o ID do documento.
-  // Por ora, vamos retornar o ID do documento, pois o componente usa o ID para identificar a OS a ser excluída.
-  // A notificação de toast pode usar o os.osNumber que já tem no lado do cliente.
-  await deleteDoc(orderRef);
-  return id; // Retorna o ID do documento Firestore
+  const { error } = await supabase
+    .from(SERVICE_ORDERS_TABLE)
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Erro ao deletar ordem de serviço:', error);
+    throw new Error('Erro ao deletar ordem de serviço');
+  }
+
+  return id;
 };

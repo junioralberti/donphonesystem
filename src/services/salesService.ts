@@ -1,25 +1,11 @@
+import { supabase } from '@/lib/supabase';
 
-import {
-  collection,
-  addDoc,
-  serverTimestamp,
-  Timestamp,
-  type DocumentData,
-  type QueryDocumentSnapshot,
-  getDocs,
-  query,
-  orderBy
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-
-// Tipos replicados de onde são usados ou inferidos
 export type PaymentMethod = "Dinheiro" | "Cartão de Crédito" | "Cartão de Débito" | "PIX";
 
 export interface CartItemInput {
   name: string;
   quantity: number;
-  price: number; // No counter-sales, é price. Em OS é unitPrice. Usaremos 'price' para este contexto.
-  // totalPrice é calculado no frontend para counter-sales e não é explicitamente parte do CartItemInput original
+  price: number;
 }
 
 export interface SaleInput {
@@ -27,39 +13,46 @@ export interface SaleInput {
   items: CartItemInput[];
   paymentMethod: PaymentMethod | null;
   totalAmount: number;
-  // saleId e date são adicionados/gerenciados pelo serviço/backend
 }
 
 export interface Sale extends SaleInput {
   id: string;
-  createdAt: Date | Timestamp;
+  createdAt: Date;
 }
 
-const SALES_COLLECTION = 'sales';
-
-const saleFromDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): Sale => {
-  const data = docSnap.data();
-  return {
-    id: docSnap.id,
-    clientName: data.clientName || null,
-    items: data.items || [],
-    paymentMethod: data.paymentMethod || null,
-    totalAmount: data.totalAmount || 0,
-    createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
-  };
-};
+const SALES_TABLE = 'sales';
 
 export const addSale = async (saleData: SaleInput): Promise<string> => {
-  const docRef = await addDoc(collection(db, SALES_COLLECTION), {
-    ...saleData,
-    createdAt: serverTimestamp(),
-  });
-  // O componente counter-sales usa o ID da venda na notificação
-  return docRef.id; 
+  const { data, error } = await supabase
+    .from(SALES_TABLE)
+    .insert({
+      ...saleData,
+      createdAt: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Erro ao adicionar venda:', error);
+    throw new Error('Erro ao adicionar venda');
+  }
+
+  return data.id;
 };
 
 export const getSales = async (): Promise<Sale[]> => {
-  const q = query(collection(db, SALES_COLLECTION), orderBy('createdAt', 'desc'));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(saleFromDoc);
+  const { data, error } = await supabase
+    .from(SALES_TABLE)
+    .select('*')
+    .order('createdAt', { ascending: false });
+
+  if (error) {
+    console.error('Erro ao buscar vendas:', error);
+    throw new Error('Erro ao buscar vendas');
+  }
+
+  return data.map((sale: any) => ({
+    ...sale,
+    createdAt: sale.createdAt ? new Date(sale.createdAt) : new Date(),
+  }));
 };

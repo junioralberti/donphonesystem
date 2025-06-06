@@ -1,65 +1,80 @@
-
-import {
-  collection,
-  addDoc,
-  getDocs,
-  doc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  query,
-  orderBy,
-  Timestamp,
-  type DocumentData,
-  type QueryDocumentSnapshot,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import type { User, UserRole } from '@/lib/schemas/user';
 
-const USERS_COLLECTION = 'users';
+const USERS_TABLE = 'users';
 
-// Tipo para dados que realmente serão salvos, omitindo senhas e campos de confirmação.
+// Dados salvos (sem senha ou confirmação)
 type StorableUserData = Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'password' | 'confirmPassword'>;
 
-const userFromDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): User => {
-  const data = docSnap.data();
-  return {
-    id: docSnap.id,
-    name: data.name || '',
-    email: data.email || '',
-    role: data.role || 'user',
-    // Campos de senha não são lidos do Firestore
-    createdAt: (data.createdAt as Timestamp)?.toDate(),
-    updatedAt: (data.updatedAt as Timestamp)?.toDate(),
-  };
-};
+const userFromRow = (row: any): User => ({
+  id: row.id,
+  name: row.name || '',
+  email: row.email || '',
+  role: row.role || 'user',
+  createdAt: row.createdAt ? new Date(row.createdAt) : undefined,
+  updatedAt: row.updatedAt ? new Date(row.updatedAt) : undefined,
+});
 
 export const addUser = async (userData: StorableUserData): Promise<string> => {
-  // userData aqui já não deve conter password ou confirmPassword
-  const docRef = await addDoc(collection(db, USERS_COLLECTION), {
-    ...userData, // Salva apenas name, email, role
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from(USERS_TABLE)
+    .insert([{ 
+      ...userData, 
+      createdAt: now,
+      updatedAt: now,
+    }])
+    .select('id') // retorna apenas o ID
+    .single();
+
+  if (error) {
+    console.error('Erro ao adicionar usuário:', error);
+    throw new Error('Erro ao adicionar usuário');
+  }
+
+  return data.id;
 };
 
 export const getUsers = async (): Promise<User[]> => {
-  const q = query(collection(db, USERS_COLLECTION), orderBy('name', 'asc'));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(userFromDoc);
+  const { data, error } = await supabase
+    .from(USERS_TABLE)
+    .select('*')
+    .order('name', { ascending: true });
+
+  if (error) {
+    console.error('Erro ao buscar usuários:', error);
+    throw new Error('Erro ao buscar usuários');
+  }
+
+  return data.map(userFromRow);
 };
 
 export const updateUser = async (id: string, userData: Partial<StorableUserData>): Promise<void> => {
-  // userData aqui também não deve conter password ou confirmPassword
-  const userRef = doc(db, USERS_COLLECTION, id);
-  await updateDoc(userRef, {
-    ...userData,
-    updatedAt: serverTimestamp(),
-  });
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .from(USERS_TABLE)
+    .update({
+      ...userData,
+      updatedAt: now,
+    })
+    .eq('id', id);
+
+  if (error) {
+    console.error('Erro ao atualizar usuário:', error);
+    throw new Error('Erro ao atualizar usuário');
+  }
 };
 
 export const deleteUser = async (id: string): Promise<void> => {
-  const userRef = doc(db, USERS_COLLECTION, id);
-  await deleteDoc(userRef);
+  const { error } = await supabase
+    .from(USERS_TABLE)
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Erro ao deletar usuário:', error);
+    throw new Error('Erro ao deletar usuário');
+  }
 };
