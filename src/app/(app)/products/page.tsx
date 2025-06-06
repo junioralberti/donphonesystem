@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,10 +5,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Loader2, PackageSearch, AlertTriangle } from "lucide-react";
+import { PlusCircle, Loader2, AlertTriangle } from "lucide-react";
 import { ProductForm } from "@/components/products/product-form";
 import { ProductsTable } from "@/components/products/products-table";
-import { getProducts, addProduct, updateProduct, deleteProduct } from "@/services/productService";
+import { getProducts, addProduct, updateProduct, deleteProduct } from "@/services/productService"; // <- serviço Supabase
 import type { Product } from "@/lib/schemas/product";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,7 +17,7 @@ export default function ProductsPage() {
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
   const [isEditProductDialogOpen, setIsEditProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -39,7 +38,7 @@ export default function ProductsPage() {
   }, [productsError, toast]);
 
   const addProductMutation = useMutation({
-    mutationFn: (newProduct: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => addProduct(newProduct),
+    mutationFn: (newProduct: Omit<Product, "id" | "createdAt" | "updatedAt">) => addProduct(newProduct),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       toast({ title: "Produto Adicionado", description: "Novo produto adicionado com sucesso." });
@@ -51,7 +50,7 @@ export default function ProductsPage() {
   });
 
   const updateProductMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Product, 'id' | 'createdAt'>> }) => updateProduct(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Product, "id" | "createdAt">> }) => updateProduct(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       toast({ title: "Sucesso!", description: "Produto atualizado com sucesso." });
@@ -93,11 +92,11 @@ export default function ProductsPage() {
     setEditingProduct(product);
     setIsEditProductDialogOpen(true);
   };
-  
+
   const ProductListSkeleton = () => (
     <div className="space-y-3">
       {[...Array(4)].map((_, i) => (
-         <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+        <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
           <div className="space-y-1.5 w-full">
             <Skeleton className="h-5 w-1/2 rounded" />
             <Skeleton className="h-3 w-1/4 rounded" />
@@ -126,10 +125,7 @@ export default function ProductsPage() {
               <DialogTitle>Adicionar Novo Produto</DialogTitle>
               <DialogDescription>Preencha os detalhes do novo produto.</DialogDescription>
             </DialogHeader>
-            <ProductForm 
-              onSubmit={handleAddProduct} 
-              isLoading={addProductMutation.isPending} 
-            />
+            <ProductForm onSubmit={handleAddProduct} isLoading={addProductMutation.isPending} />
           </DialogContent>
         </Dialog>
       </div>
@@ -141,7 +137,7 @@ export default function ProductsPage() {
         </CardHeader>
         <CardContent>
           {isLoadingProducts ? (
-             <ProductListSkeleton />
+            <ProductListSkeleton />
           ) : productsError ? (
             <div className="flex flex-col items-center justify-center gap-3 py-10 text-center text-destructive">
               <AlertTriangle className="h-12 w-12" />
@@ -153,9 +149,9 @@ export default function ProductsPage() {
               </Button>
             </div>
           ) : (
-            <ProductsTable 
-              products={products || []} 
-              onEdit={openEditDialog} 
+            <ProductsTable
+              products={products || []}
+              onEdit={openEditDialog}
               onDelete={handleDeleteProduct}
               isLoadingDeleteForId={deleteProductMutation.isPending ? deleteProductMutation.variables : null}
             />
@@ -171,12 +167,12 @@ export default function ProductsPage() {
           <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
               <DialogTitle>Editar Produto</DialogTitle>
-               <DialogDescription>Atualize os dados do produto selecionado.</DialogDescription>
+              <DialogDescription>Atualize os dados do produto selecionado.</DialogDescription>
             </DialogHeader>
-            <ProductForm 
-              onSubmit={handleUpdateProduct} 
-              defaultValues={editingProduct} 
-              isEditing 
+            <ProductForm
+              onSubmit={handleUpdateProduct}
+              defaultValues={editingProduct}
+              isEditing
               isLoading={updateProductMutation.isPending}
             />
           </DialogContent>

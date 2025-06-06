@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -13,6 +12,8 @@ import { getProviders, addProvider, updateProvider, deleteProvider } from "@/ser
 import type { Provider } from "@/lib/schemas/provider";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+
+type ProviderDataToSave = Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>;
 
 export default function ProvidersPage() {
   const [isAddProviderDialogOpen, setIsAddProviderDialogOpen] = useState(false);
@@ -39,7 +40,7 @@ export default function ProvidersPage() {
   }, [providersError, toast]);
 
   const addProviderMutation = useMutation({
-    mutationFn: (newProvider: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>) => addProvider(newProvider),
+    mutationFn: (newProvider: ProviderDataToSave) => addProvider(newProvider),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["providers"] });
       toast({ title: "Fornecedor Adicionado", description: "Novo fornecedor adicionado com sucesso." });
@@ -51,7 +52,7 @@ export default function ProvidersPage() {
   });
 
   const updateProviderMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Provider, 'id' | 'createdAt'>> }) => updateProvider(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<ProviderDataToSave> }) => updateProvider(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["providers"] });
       toast({ title: "Sucesso!", description: "Fornecedor atualizado com sucesso." });
@@ -97,7 +98,7 @@ export default function ProvidersPage() {
   const ProviderListSkeleton = () => (
     <div className="space-y-3">
       {[...Array(4)].map((_, i) => (
-         <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+        <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
           <div className="space-y-1.5 w-full">
             <Skeleton className="h-5 w-1/2 rounded" />
             <Skeleton className="h-3 w-1/3 rounded" />
@@ -141,7 +142,7 @@ export default function ProvidersPage() {
         </CardHeader>
         <CardContent>
           {isLoadingProviders ? (
-             <ProviderListSkeleton />
+            <ProviderListSkeleton />
           ) : providersError ? (
             <div className="flex flex-col items-center justify-center gap-3 py-10 text-center text-destructive">
               <AlertTriangle className="h-12 w-12" />
@@ -171,7 +172,7 @@ export default function ProvidersPage() {
           <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
               <DialogTitle>Editar Fornecedor</DialogTitle>
-               <DialogDescription>Atualize os dados do fornecedor selecionado.</DialogDescription>
+              <DialogDescription>Atualize os dados do fornecedor selecionado.</DialogDescription>
             </DialogHeader>
             <ProviderForm 
               onSubmit={handleUpdateProvider} 

@@ -1,60 +1,66 @@
+import { supabase } from '@/lib/supabaseClient'
+import type { Client } from '@/lib/schemas/client'
 
-import {
-  collection,
-  addDoc,
-  getDocs,
-  doc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  query,
-  orderBy,
-  Timestamp,
-  type DocumentData,
-  type QueryDocumentSnapshot,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import type { Client } from '@/lib/schemas/client';
+const TABLE_NAME = 'clientes'
 
-const CLIENTS_COLLECTION = 'clients';
+export const addClient = async (
+  clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<string | null> => {
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .insert([{ ...clientData }])
+    .select()
+    .single()
 
-const clientFromDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): Client => {
-  const data = docSnap.data();
-  return {
-    id: docSnap.id,
-    name: data.name || '',
-    email: data.email || '',
-    phone: data.phone || '',
-    address: data.address || '',
-    createdAt: (data.createdAt as Timestamp)?.toDate(),
-    updatedAt: (data.updatedAt as Timestamp)?.toDate(),
-  };
-};
+  if (error) {
+    console.error('Erro ao adicionar cliente:', error)
+    return null
+  }
 
-export const addClient = async (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, CLIENTS_COLLECTION), {
-    ...clientData,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return docRef.id;
-};
+  return data?.id ?? null
+}
 
 export const getClients = async (): Promise<Client[]> => {
-  const q = query(collection(db, CLIENTS_COLLECTION), orderBy('name', 'asc'));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(clientFromDoc);
-};
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .select('*')
+    .order('nome', { ascending: true })
 
-export const updateClient = async (id: string, clientData: Partial<Omit<Client, 'id' | 'createdAt'>>): Promise<void> => {
-  const clientRef = doc(db, CLIENTS_COLLECTION, id);
-  await updateDoc(clientRef, {
-    ...clientData,
-    updatedAt: serverTimestamp(),
-  });
-};
+  if (error) {
+    console.error('Erro ao buscar clientes:', error)
+    return []
+  }
 
-export const deleteClient = async (id: string): Promise<void> => {
-  const clientRef = doc(db, CLIENTS_COLLECTION, id);
-  await deleteDoc(clientRef);
-};
+  return data as Client[]
+}
+
+export const updateClient = async (
+  id: string,
+  clientData: Partial<Omit<Client, 'id' | 'createdAt'>>
+): Promise<boolean> => {
+  const { error } = await supabase
+    .from(TABLE_NAME)
+    .update({ ...clientData })
+    .eq('id', id)
+
+  if (error) {
+    console.error('Erro ao atualizar cliente:', error)
+    return false
+  }
+
+  return true
+}
+
+export const deleteClient = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from(TABLE_NAME)
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Erro ao deletar cliente:', error)
+    return false
+  }
+
+  return true
+}

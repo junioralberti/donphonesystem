@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, ShieldAlert, Loader2, AlertTriangle, UserX } from "lucide-react";
+import { PlusCircle, ShieldAlert, Loader2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter } from "next/navigation";
 import { UserForm } from "@/components/users/user-form";
@@ -16,9 +15,7 @@ import type { User } from "@/lib/schemas/user";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Define um tipo para os dados que serão realmente salvos, omitindo a senha.
 type UserDataToSave = Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'password' | 'confirmPassword'>;
-
 
 export default function UsersPage() {
   const { userRole, isAuthenticated } = useAuth(); 
@@ -46,7 +43,7 @@ export default function UsersPage() {
     if (usersError) {
       toast({
         title: "Erro ao Carregar Usuários",
-        description: "Não foi possível buscar os dados dos usuários. Verifique sua conexão ou tente novamente.",
+        description: "Não foi possível buscar os dados dos usuários.",
         variant: "destructive",
         duration: 10000,
       });
@@ -61,7 +58,7 @@ export default function UsersPage() {
       setIsAddUserDialogOpen(false);
     },
     onError: (error: Error) => {
-      toast({ title: "Erro", description: `Falha ao adicionar usuário: ${error.message}`, variant: "destructive" });
+      toast({ title: "Erro", description: `Erro ao adicionar: ${error.message}`, variant: "destructive" });
     },
   });
 
@@ -74,7 +71,7 @@ export default function UsersPage() {
       setEditingUser(null);
     },
     onError: (error: Error) => {
-      toast({ title: "Erro", description: `Falha ao atualizar usuário: ${error.message}`, variant: "destructive" });
+      toast({ title: "Erro", description: `Erro ao atualizar: ${error.message}`, variant: "destructive" });
     },
   });
 
@@ -82,21 +79,20 @@ export default function UsersPage() {
     mutationFn: deleteUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      toast({ title: "Sucesso!", description: "Usuário excluído com sucesso." });
+      toast({ title: "Usuário Removido", description: "Usuário excluído com sucesso." });
     },
     onError: (error: Error) => {
-      toast({ title: "Erro", description: `Falha ao excluir usuário: ${error.message}`, variant: "destructive" });
+      toast({ title: "Erro", description: `Erro ao excluir: ${error.message}`, variant: "destructive" });
     },
   });
 
   const handleAddUser = async (data: User) => {
-    // Extrai apenas os campos que queremos salvar, omitindo senhas e campos de controle.
     const { id, createdAt, updatedAt, password, confirmPassword, ...userDataToSave } = data;
     await addUserMutation.mutateAsync(userDataToSave);
   };
 
   const handleUpdateUser = async (data: User) => {
-    if (!editingUser || !editingUser.id) return;
+    if (!editingUser?.id) return;
     const { id, createdAt, updatedAt, password, confirmPassword, ...userDataToSave } = data;
     await updateUserMutation.mutateAsync({ id: editingUser.id, data: userDataToSave });
   };
@@ -155,9 +151,7 @@ export default function UsersPage() {
           <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
               <DialogTitle>Adicionar Novo Usuário</DialogTitle>
-              <DialogDescription>
-                Preencha os dados do novo usuário.
-              </DialogDescription>
+              <DialogDescription>Preencha os dados do novo usuário.</DialogDescription>
             </DialogHeader>
             <UserForm 
               onSubmit={handleAddUser} 
@@ -170,7 +164,7 @@ export default function UsersPage() {
       <Card>
         <CardHeader>
           <CardTitle>Lista de Usuários</CardTitle>
-          <CardDescription>Gerencie usuários do sistema e suas funções (Admin/Usuário).</CardDescription>
+          <CardDescription>Gerencie os usuários cadastrados no sistema.</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoadingUsers ? (
@@ -204,7 +198,7 @@ export default function UsersPage() {
           <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
               <DialogTitle>Editar Usuário</DialogTitle>
-               <DialogDescription>Atualize os dados do usuário selecionado.</DialogDescription>
+              <DialogDescription>Atualize os dados do usuário selecionado.</DialogDescription>
             </DialogHeader>
             <UserForm 
               onSubmit={handleUpdateUser} 

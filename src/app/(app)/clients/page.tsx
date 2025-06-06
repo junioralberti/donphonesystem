@@ -1,13 +1,16 @@
-
+// src/app/(app)/clients/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import type { UseFormReturn } from "react-hook-form";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { PlusCircle, Loader2, UserRoundX, AlertTriangle } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription
+} from "@/components/ui/dialog";
+import { PlusCircle, Loader2, AlertTriangle } from "lucide-react";
 import { ClientForm } from "@/components/clients/client-form";
 import { ClientsTable } from "@/components/clients/clients-table";
 import { getClients, addClient, updateClient, deleteClient } from "@/services/clientService";
@@ -26,7 +29,6 @@ export default function ClientsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  // State to control the default values for the add client form, allowing reset
   const [addClientFormDefaultValues, setAddClientFormDefaultValues] = useState<Partial<Client>>(initialClientFormValues);
 
   const queryClient = useQueryClient();
@@ -41,7 +43,7 @@ export default function ClientsPage() {
     if (clientsError) {
       toast({
         title: "Erro ao Carregar Clientes",
-        description: "Não foi possível buscar os dados dos clientes. Verifique sua conexão ou tente novamente.",
+        description: "Não foi possível buscar os dados dos clientes.",
         variant: "destructive",
         duration: 10000,
       });
@@ -53,11 +55,11 @@ export default function ClientsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       toast({ title: "Cliente Adicionado", description: "Novo cliente adicionado com sucesso." });
-      setIsAddDialogOpen(false); // This should close the dialog
-      setAddClientFormDefaultValues(initialClientFormValues); // Reset form values for next add
+      setIsAddDialogOpen(false);
+      setAddClientFormDefaultValues(initialClientFormValues);
     },
     onError: (error: Error) => {
-      toast({ title: "Erro", description: `Falha ao adicionar cliente: ${error.message}`, variant: "destructive" });
+      toast({ title: "Erro", description: `Erro: ${error.message}`, variant: "destructive" });
     },
   });
 
@@ -65,12 +67,12 @@ export default function ClientsPage() {
     mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Client, 'id' | 'createdAt'>> }) => updateClient(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-      toast({ title: "Sucesso!", description: "Cliente atualizado com sucesso." });
+      toast({ title: "Sucesso!", description: "Cliente atualizado." });
       setIsEditDialogOpen(false);
       setEditingClient(null);
     },
     onError: (error: Error) => {
-      toast({ title: "Erro", description: `Falha ao atualizar cliente: ${error.message}`, variant: "destructive" });
+      toast({ title: "Erro", description: `Erro: ${error.message}`, variant: "destructive" });
     },
   });
 
@@ -78,10 +80,10 @@ export default function ClientsPage() {
     mutationFn: deleteClient,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-      toast({ title: "Sucesso!", description: "Cliente excluído com sucesso." });
+      toast({ title: "Sucesso!", description: "Cliente excluído." });
     },
     onError: (error: Error) => {
-      toast({ title: "Erro", description: `Falha ao excluir cliente: ${error.message}`, variant: "destructive" });
+      toast({ title: "Erro", description: `Erro: ${error.message}`, variant: "destructive" });
     },
   });
 
@@ -91,8 +93,8 @@ export default function ClientsPage() {
   };
 
   const handleUpdateClient = async (data: Client) => {
-    if (!editingClient || !editingClient.id) return;
-    const { id, createdAt, updatedAt, ...clientData } = data; 
+    if (!editingClient?.id) return;
+    const { id, createdAt, updatedAt, ...clientData } = data;
     await updateClientMutation.mutateAsync({ id: editingClient.id, data: clientData });
   };
 
@@ -100,21 +102,15 @@ export default function ClientsPage() {
     await deleteClientMutation.mutateAsync(clientId);
   };
 
-  const openEditDialog = (client: Client) => {
-    setEditingClient(client);
-    setIsEditDialogOpen(true);
+  const openAddDialog = () => {
+    setAddClientFormDefaultValues(initialClientFormValues);
+    setIsAddDialogOpen(true);
   };
 
-  // When opening the add dialog, ensure the form values are reset.
-  const openAddDialog = () => {
-    setAddClientFormDefaultValues(initialClientFormValues); 
-    setIsAddDialogOpen(true);
-  }
-  
   const ClientListSkeleton = () => (
     <div className="space-y-3">
       {[...Array(4)].map((_, i) => (
-         <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+        <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
           <div className="space-y-1.5">
             <Skeleton className="h-5 w-40 rounded" />
             <Skeleton className="h-3 w-60 rounded" />
@@ -132,29 +128,18 @@ export default function ClientsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="font-headline text-3xl font-semibold">Gerenciamento de Clientes</h1>
-        <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-          setIsAddDialogOpen(isOpen);
-          if (!isOpen) {
-            // Also reset if dialog is closed manually (e.g. by clicking X or overlay)
-            setAddClientFormDefaultValues(initialClientFormValues); 
-          }
-        }}>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            {/* Call openAddDialog to ensure form state is reset before opening */}
-            <Button onClick={openAddDialog}> 
+            <Button onClick={openAddDialog}>
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Novo Cliente
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
               <DialogTitle>Adicionar Novo Cliente</DialogTitle>
-              <DialogDescription>Preencha os dados do novo cliente para cadastrá-lo no sistema.</DialogDescription>
+              <DialogDescription>Preencha os dados do novo cliente.</DialogDescription>
             </DialogHeader>
-            <ClientForm 
-              onSubmit={handleAddClient} 
-              isLoading={addClientMutation.isPending} 
-              defaultValues={addClientFormDefaultValues} // Pass the state for default values
-            />
+            <ClientForm onSubmit={handleAddClient} isLoading={addClientMutation.isPending} defaultValues={addClientFormDefaultValues} />
           </DialogContent>
         </Dialog>
       </div>
@@ -166,21 +151,20 @@ export default function ClientsPage() {
         </CardHeader>
         <CardContent>
           {isLoadingClients ? (
-             <ClientListSkeleton />
+            <ClientListSkeleton />
           ) : clientsError ? (
             <div className="flex flex-col items-center justify-center gap-3 py-10 text-center text-destructive">
               <AlertTriangle className="h-12 w-12" />
               <p className="text-lg font-medium">Erro ao carregar clientes</p>
               <p className="text-sm text-muted-foreground">{clientsError.message}</p>
               <Button onClick={() => refetchClients()} className="mt-3">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin data-[hide=true]:hidden" data-hide={!isLoadingClients && !addClientMutation.isPending && !updateClientMutation.isPending && !deleteClientMutation.isPending} />
-                Tentar Novamente
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Tentar Novamente
               </Button>
             </div>
           ) : (
-            <ClientsTable 
-              clients={clients || []} 
-              onEdit={openEditDialog} 
+            <ClientsTable
+              clients={clients || []}
+              onEdit={(c) => { setEditingClient(c); setIsEditDialogOpen(true); }}
               onDelete={handleDeleteClient}
               isLoadingDeleteForId={deleteClientMutation.isPending ? deleteClientMutation.variables : null}
             />
@@ -189,21 +173,13 @@ export default function ClientsPage() {
       </Card>
 
       {editingClient && (
-        <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
-          setIsEditDialogOpen(isOpen);
-          if (!isOpen) setEditingClient(null);
-        }}>
+        <Dialog open={isEditDialogOpen} onOpenChange={(v) => { setIsEditDialogOpen(v); if (!v) setEditingClient(null); }}>
           <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
               <DialogTitle>Editar Cliente</DialogTitle>
-               <DialogDescription>Atualize os dados do cliente selecionado.</DialogDescription>
+              <DialogDescription>Atualize os dados do cliente selecionado.</DialogDescription>
             </DialogHeader>
-            <ClientForm 
-              onSubmit={handleUpdateClient} 
-              defaultValues={editingClient} 
-              isEditing 
-              isLoading={updateClientMutation.isPending}
-            />
+            <ClientForm onSubmit={handleUpdateClient} defaultValues={editingClient} isEditing isLoading={updateClientMutation.isPending} />
           </DialogContent>
         </Dialog>
       )}
