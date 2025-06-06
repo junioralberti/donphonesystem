@@ -1,62 +1,55 @@
-
-import {
-  collection,
-  addDoc,
-  getDocs,
-  doc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  query,
-  orderBy,
-  Timestamp,
-  type DocumentData,
-  type QueryDocumentSnapshot,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import type { Provider } from '@/lib/schemas/provider';
 
-const PROVIDERS_COLLECTION = 'providers';
+const PROVIDERS_TABLE = 'providers';
 
-const providerFromDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): Provider => {
-  const data = docSnap.data();
-  return {
-    id: docSnap.id,
-    name: data.name || '',
-    contactPerson: data.contactPerson || '',
-    email: data.email || '',
-    phone: data.phone || '',
-    cnpj: data.cnpj || '',
-    address: data.address || '',
-    createdAt: (data.createdAt as Timestamp)?.toDate(),
-    updatedAt: (data.updatedAt as Timestamp)?.toDate(),
-  };
-};
+export const addProvider = async (
+  providerData: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<string> => {
+  const { data, error } = await supabase
+    .from(PROVIDERS_TABLE)
+    .insert([
+      {
+        ...providerData,
+      },
+    ])
+    .select('id')
+    .single();
 
-export const addProvider = async (providerData: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, PROVIDERS_COLLECTION), {
-    ...providerData,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return docRef.id;
+  if (error) throw new Error(error.message);
+  return data.id;
 };
 
 export const getProviders = async (): Promise<Provider[]> => {
-  const q = query(collection(db, PROVIDERS_COLLECTION), orderBy('name', 'asc'));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(providerFromDoc);
+  const { data, error } = await supabase
+    .from(PROVIDERS_TABLE)
+    .select('*')
+    .order('name', { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return data as Provider[];
 };
 
-export const updateProvider = async (id: string, providerData: Partial<Omit<Provider, 'id' | 'createdAt'>>): Promise<void> => {
-  const providerRef = doc(db, PROVIDERS_COLLECTION, id);
-  await updateDoc(providerRef, {
-    ...providerData,
-    updatedAt: serverTimestamp(),
-  });
+export const updateProvider = async (
+  id: string,
+  providerData: Partial<Omit<Provider, 'id' | 'createdAt'>>
+): Promise<void> => {
+  const { error } = await supabase
+    .from(PROVIDERS_TABLE)
+    .update({
+      ...providerData,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
 };
 
 export const deleteProvider = async (id: string): Promise<void> => {
-  const providerRef = doc(db, PROVIDERS_COLLECTION, id);
-  await deleteDoc(providerRef);
+  const { error } = await supabase
+    .from(PROVIDERS_TABLE)
+    .delete()
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
 };
