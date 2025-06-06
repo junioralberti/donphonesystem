@@ -1,5 +1,25 @@
-# Firebase Studio
+# DonPhone System
 
-This is a NextJS starter in Firebase Studio.
+Este é um sistema de gestão desenvolvido com Next.js e Supabase, substituindo o Firebase.
 
-To get started, take a look at src/app/page.tsx.
+## Tecnologias
+
+- Next.js 14
+- TypeScript
+- Supabase (auth, database, storage)
+- TailwindCSS
+
+## Pastas principais
+
+- `src/app/` — Páginas principais da aplicação.
+- `src/services/` — Serviços de integração com Supabase.
+- `src/lib/supabase.ts` — Configuração do Supabase Client.
+
+## Scripts úteis
+
+```bash
+# Rodar localmente
+npm run dev
+
+# Build para produção
+npm run build
