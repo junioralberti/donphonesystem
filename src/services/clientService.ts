@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient'
+import supabase from '@/utils/supabaseClient'
 import type { Client } from '@/lib/schemas/client'
 
 const TABLE_NAME = 'clientes'
