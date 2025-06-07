@@ -1,7 +1,10 @@
-import supabase from '@/utils/supabaseClient'
+import { supabase } from '@/utils/supabaseClient'
+
+
 import type { Client } from '@/lib/schemas/client'
 
-const TABLE_NAME = 'clientes'
+// Certifique-se de que o nome está EXATAMENTE igual ao da tabela no Supabase
+const TABLE_NAME = 'clients' // ou 'clientes', se for esse o nome real da tabela
 
 export const addClient = async (
   clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>
@@ -24,7 +27,7 @@ export const getClients = async (): Promise<Client[]> => {
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .select('*')
-    .order('nome', { ascending: true })
+    .order('name', { ascending: true }) // Corrigido: usa 'name' se for o nome correto
 
   if (error) {
     console.error('Erro ao buscar clientes:', error)
