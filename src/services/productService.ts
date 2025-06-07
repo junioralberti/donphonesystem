@@ -1,4 +1,4 @@
-import supabase from '@/utils/supabaseClient'
+import { supabase } from '@/utils/supabaseClient'
 import type { Product } from '@/lib/schemas/product'
 
 // Buscar todos os produtos
