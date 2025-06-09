@@ -4,7 +4,7 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     // Allow public read for the specific logo file
-    match /establishment_logo/app_logo {
+    match /establishment-logo/app_logo {
       allow read: if true;
       // CHANGED: Allow admin or user to write (upload/update/delete)
       allow write: if request.auth != null && (request.auth.token.role == 'admin' || request.auth.token.role == 'user');

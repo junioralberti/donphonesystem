@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 
 const SETTINGS_TABLE = 'systemSettings';
 const ESTABLISHMENT_DOC_ID = 'establishmentDetails';
-const LOGO_STORAGE_PATH = 'establishment_logo/app_logo.png'; // nome fixo no bucket
+const LOGO_STORAGE_PATH = 'establishment-logo/app_logo.png'; // nome fixo no bucket
 
 export interface EstablishmentSettings {
   businessName?: string;
