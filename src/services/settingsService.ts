@@ -2,7 +2,8 @@ import { supabase } from '@/lib/supabase';
 
 const SETTINGS_TABLE = 'systemSettings';
 const ESTABLISHMENT_DOC_ID = 'establishmentDetails';
-const LOGO_STORAGE_PATH = 'establishment-logo/app_logo.png'; // nome fixo no bucket
+const LOGO_STORAGE_PATH = 'app_logo.png'; // Nome do arquivo no bucket
+const BUCKET_NAME = 'establishment-logo'; // Nome do bucket correto
 
 export interface EstablishmentSettings {
   businessName?: string;
@@ -33,7 +34,7 @@ export const getEstablishmentSettings = async (): Promise<EstablishmentSettings 
     .eq('id', ESTABLISHMENT_DOC_ID)
     .single();
 
-  if (error && error.code !== 'PGRST116') { // 116 = no rows returned
+  if (error && error.code !== 'PGRST116') {
     console.error('Erro ao buscar configurações:', error);
     throw new Error('Erro ao buscar configurações');
   }
@@ -53,7 +54,7 @@ export const saveEstablishmentSettings = async (
   if (logoFile) {
     // Upload da nova logo
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('public') // certifique-se que este bucket existe e é público
+      .from(BUCKET_NAME)
       .upload(LOGO_STORAGE_PATH, logoFile, { upsert: true });
 
     if (uploadError) {
@@ -61,12 +62,15 @@ export const saveEstablishmentSettings = async (
       throw new Error('Erro ao enviar nova logo');
     }
 
-    const { data: urlData } = supabase.storage.from('public').getPublicUrl(LOGO_STORAGE_PATH);
+    const { data: urlData } = supabase.storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(LOGO_STORAGE_PATH);
+      
     newLogoUrl = urlData?.publicUrl;
   } else if (logoFile === null && currentSettings?.logoUrl && !currentSettings.logoUrl.includes('placehold.co')) {
     // Remoção da logo
     const { error: deleteError } = await supabase.storage
-      .from('public')
+      .from(BUCKET_NAME)
       .remove([LOGO_STORAGE_PATH]);
 
     if (deleteError && deleteError.message !== 'The resource was not found') {
