@@ -1,7 +1,7 @@
 # DonPhone System
 
 Este é um sistema de gestão desenvolvido com Next.js e Supabase, substituindo o Firebase.
-ALBERTI
+ALBERTI JUNIOR
 ## Tecnologias
 
 - Next.js 14
