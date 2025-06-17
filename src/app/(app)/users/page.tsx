@@ -11,14 +11,19 @@ import { useRouter } from "next/navigation";
 import { UserForm } from "@/components/users/user-form";
 import { UsersTable } from "@/components/users/users-table";
 import { getUsers, addUser, updateUser, deleteUser } from "@/services/userService";
-import type { User } from "@/lib/schemas/user";
+import type { User, CreateUserFormData } from "@/lib/schemas/user"; // Import CreateUserFormData
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
+<<<<<<< HEAD
 type UserDataToSave = Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'password' | 'confirmPassword'>;
+=======
+// Define um tipo para os dados que serão realmente salvos na atualização, omitindo a senha.
+type UserDataToUpdate = Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'password' | 'confirmPassword'>;
+>>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
 
 export default function UsersPage() {
-  const { userRole, isAuthenticated } = useAuth(); 
+  const { userRole, isAuthenticated, firebaseUser } = useAuth(); 
   const router = useRouter();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -51,7 +56,8 @@ export default function UsersPage() {
   }, [usersError, toast]);
 
   const addUserMutation = useMutation({
-    mutationFn: (newUserData: UserDataToSave) => addUser(newUserData),
+    // The mutationFn now expects CreateUserFormData or User, but addUser service expects User with password
+    mutationFn: (newUserData: CreateUserFormData | User) => addUser(newUserData as User),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       toast({ title: "Usuário Adicionado", description: "Novo usuário adicionado com sucesso." });
@@ -63,7 +69,7 @@ export default function UsersPage() {
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<UserDataToSave> }) => updateUser(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<UserDataToUpdate> }) => updateUser(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       toast({ title: "Sucesso!", description: "Usuário atualizado com sucesso." });
@@ -86,6 +92,7 @@ export default function UsersPage() {
     },
   });
 
+<<<<<<< HEAD
   const handleAddUser = async (data: User) => {
     const { id, createdAt, updatedAt, password, confirmPassword, ...userDataToSave } = data;
     await addUserMutation.mutateAsync(userDataToSave);
@@ -95,9 +102,30 @@ export default function UsersPage() {
     if (!editingUser?.id) return;
     const { id, createdAt, updatedAt, password, confirmPassword, ...userDataToSave } = data;
     await updateUserMutation.mutateAsync({ id: editingUser.id, data: userDataToSave });
+=======
+  const handleAddUser = async (data: CreateUserFormData | User) => {
+    // addUser in userService expects User type with potentially password.
+    // CreateUserFormData is compatible here since it includes password.
+    await addUserMutation.mutateAsync(data as User);
+  };
+
+  const handleUpdateUser = async (data: User | CreateUserFormData) => {
+    if (!editingUser || !editingUser.id) return;
+    // For update, we send UserDataToUpdate. Ensure data is cast to User to access all fields if needed.
+    const { id, createdAt, updatedAt, password, confirmPassword, ...userDataToUpdate } = data as User;
+    await updateUserMutation.mutateAsync({ id: editingUser.id, data: userDataToUpdate });
+>>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
   };
 
   const handleDeleteUser = async (userId: string) => {
+    if (firebaseUser?.uid === userId) {
+      toast({
+        title: "Ação não permitida",
+        description: "Você não pode excluir seu próprio usuário.",
+        variant: "destructive",
+      });
+      return;
+    }
     await deleteUserMutation.mutateAsync(userId);
   };
 
@@ -111,13 +139,13 @@ export default function UsersPage() {
       {[...Array(3)].map((_, i) => (
          <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
           <div className="space-y-1.5 w-full">
-            <Skeleton className="h-5 w-1/3 rounded" />
-            <Skeleton className="h-3 w-2/3 rounded" />
-            <Skeleton className="h-3 w-1/4 rounded mt-1" />
+            <Skeleton className="h-5 w-1/3 rounded bg-muted/50" />
+            <Skeleton className="h-3 w-2/3 rounded bg-muted/50" />
+            <Skeleton className="h-3 w-1/4 rounded mt-1 bg-muted/50" />
           </div>
           <div className="flex items-center space-x-2">
-            <Skeleton className="h-9 w-9 rounded-md" />
-            <Skeleton className="h-9 w-9 rounded-md" />
+            <Skeleton className="h-9 w-9 rounded-md bg-muted/50" />
+            <Skeleton className="h-9 w-9 rounded-md bg-muted/50" />
           </div>
         </div>
       ))}
@@ -126,14 +154,14 @@ export default function UsersPage() {
 
   if (!isAuthenticated || userRole !== 'admin') {
     if (!isAuthenticated && userRole === null) { 
-      return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /> <p className="ml-2">Carregando...</p></div>;
+      return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <p className="ml-2 text-muted-foreground">Carregando...</p></div>;
     }
     return (
        <div className="flex flex-col items-center justify-center gap-4 p-6 h-[calc(100vh-theme(spacing.28))]">
         <ShieldAlert className="h-16 w-16 text-destructive" />
-        <h2 className="text-2xl font-semibold">Acesso Negado</h2>
+        <h2 className="text-2xl font-semibold text-foreground">Acesso Negado</h2>
         <p className="text-muted-foreground">Você não tem permissão para visualizar esta página.</p>
-        <Button onClick={() => router.push('/dashboard')}>Ir para o Painel</Button>
+        <Button onClick={() => router.push('/dashboard')} className="bg-accent hover:bg-accent/90 text-accent-foreground">Ir para o Painel</Button>
       </div>
     );
   }
@@ -141,10 +169,10 @@ export default function UsersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-headline text-3xl font-semibold">Gerenciamento de Usuários</h1>
+        <h1 className="font-headline text-3xl font-semibold text-foreground">Gerenciamento de Usuários</h1>
         <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Novo Usuário
             </Button>
           </DialogTrigger>
@@ -155,7 +183,8 @@ export default function UsersPage() {
             </DialogHeader>
             <UserForm 
               onSubmit={handleAddUser} 
-              isLoading={addUserMutation.isPending} 
+              isLoading={addUserMutation.isPending}
+              isEditing={false} 
             />
           </DialogContent>
         </Dialog>
@@ -185,6 +214,7 @@ export default function UsersPage() {
               onEdit={openEditDialog} 
               onDelete={handleDeleteUser}
               isLoadingDeleteForId={deleteUserMutation.isPending ? deleteUserMutation.variables : null}
+              currentUserId={firebaseUser?.uid}
             />
           )}
         </CardContent>

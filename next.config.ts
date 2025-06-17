@@ -31,10 +31,17 @@ const nextConfig = {
       },
     ],
   },
+<<<<<<< HEAD
   webpack: (config) => {
     // Habilita o alias "@/"
     config.resolve.alias['@'] = path.resolve(__dirname, 'src');
     return config;
+=======
+  experimental: {
+    allowedDevOrigins: [
+      'https://6000-firebase-studio-1748881505468.cluster-etsqrqvqyvd4erxx7qq32imrjk.cloudworkstations.dev',
+    ],
+>>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
   },
 };
 

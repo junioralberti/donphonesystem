@@ -13,11 +13,24 @@ import type { Product } from "@/lib/schemas/product";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const initialProductFormValues: Partial<Product> = {
+  name: "",
+  sku: "",
+  price: 0,
+  stock: 0,
+  imageUrl: "",
+};
+
 export default function ProductsPage() {
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
   const [isEditProductDialogOpen, setIsEditProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+<<<<<<< HEAD
 
+=======
+  const [addProductFormDefaultValues, setAddProductFormDefaultValues] = useState<Partial<Product>>(initialProductFormValues);
+  
+>>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -38,11 +51,17 @@ export default function ProductsPage() {
   }, [productsError, toast]);
 
   const addProductMutation = useMutation({
+<<<<<<< HEAD
     mutationFn: (newProduct: Omit<Product, "id" | "createdAt" | "updatedAt">) => addProduct(newProduct),
+=======
+    mutationFn: ({ productData, imageFile }: { productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'imageUrl'>, imageFile?: File | null }) => 
+      addProduct(productData, imageFile),
+>>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       toast({ title: "Produto Adicionado", description: "Novo produto adicionado com sucesso." });
       setIsAddProductDialogOpen(false);
+      setAddProductFormDefaultValues(initialProductFormValues); // Reset form for next add
     },
     onError: (error: Error) => {
       toast({ title: "Erro", description: `Falha ao adicionar produto: ${error.message}`, variant: "destructive" });
@@ -50,7 +69,12 @@ export default function ProductsPage() {
   });
 
   const updateProductMutation = useMutation({
+<<<<<<< HEAD
     mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Product, "id" | "createdAt">> }) => updateProduct(id, data),
+=======
+    mutationFn: ({ id, productData, imageFile, currentImageUrl }: { id: string; productData: Partial<Omit<Product, 'id' | 'createdAt' | 'imageUrl'>>; imageFile?: File | null | undefined, currentImageUrl?: string }) => 
+      updateProduct(id, productData, imageFile, currentImageUrl),
+>>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       toast({ title: "Sucesso!", description: "Produto atualizado com sucesso." });
@@ -73,15 +97,15 @@ export default function ProductsPage() {
     },
   });
 
-  const handleAddProduct = async (data: Product) => {
-    const { id, createdAt, updatedAt, ...productData } = data;
-    await addProductMutation.mutateAsync(productData);
+  const handleAddProduct = async (data: Product, imageFile?: File | null) => {
+    const { id, createdAt, updatedAt, imageUrl, ...productData } = data;
+    await addProductMutation.mutateAsync({ productData, imageFile });
   };
 
-  const handleUpdateProduct = async (data: Product) => {
+  const handleUpdateProduct = async (data: Product, imageFile?: File | null | undefined) => {
     if (!editingProduct || !editingProduct.id) return;
-    const { id, createdAt, updatedAt, ...productData } = data;
-    await updateProductMutation.mutateAsync({ id: editingProduct.id, data: productData });
+    const { id, createdAt, updatedAt, imageUrl: currentImgUrl, ...productData } = data;
+    await updateProductMutation.mutateAsync({ id: editingProduct.id, productData, imageFile, currentImageUrl: editingProduct.imageUrl });
   };
 
   const handleDeleteProduct = async (productId: string) => {
@@ -92,18 +116,36 @@ export default function ProductsPage() {
     setEditingProduct(product);
     setIsEditProductDialogOpen(true);
   };
+<<<<<<< HEAD
+=======
+  
+  const openAddDialog = () => {
+    setAddProductFormDefaultValues(initialProductFormValues); 
+    setIsAddProductDialogOpen(true);
+  }
+>>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
 
   const ProductListSkeleton = () => (
     <div className="space-y-3">
       {[...Array(4)].map((_, i) => (
+<<<<<<< HEAD
         <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
           <div className="space-y-1.5 w-full">
             <Skeleton className="h-5 w-1/2 rounded" />
             <Skeleton className="h-3 w-1/4 rounded" />
+=======
+         <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+          <div className="flex items-center gap-4 w-full">
+            <Skeleton className="h-12 w-12 rounded-md bg-muted/50" />
+            <div className="space-y-1.5 w-full">
+              <Skeleton className="h-5 w-1/2 rounded bg-muted/50" />
+              <Skeleton className="h-3 w-1/4 rounded bg-muted/50" />
+            </div>
+>>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
           </div>
           <div className="flex items-center space-x-2">
-            <Skeleton className="h-9 w-9 rounded-md" />
-            <Skeleton className="h-9 w-9 rounded-md" />
+            <Skeleton className="h-9 w-9 rounded-md bg-muted/50" />
+            <Skeleton className="h-9 w-9 rounded-md bg-muted/50" />
           </div>
         </div>
       ))}
@@ -113,10 +155,15 @@ export default function ProductsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-headline text-3xl font-semibold">Gerenciamento de Produtos</h1>
-        <Dialog open={isAddProductDialogOpen} onOpenChange={setIsAddProductDialogOpen}>
+        <h1 className="font-headline text-3xl font-semibold text-foreground">Gerenciamento de Produtos</h1>
+        <Dialog open={isAddProductDialogOpen} onOpenChange={(isOpen) => {
+          setIsAddProductDialogOpen(isOpen);
+          if (!isOpen) {
+            setAddProductFormDefaultValues(initialProductFormValues); 
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={openAddDialog} className="bg-accent hover:bg-accent/90 text-accent-foreground">
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Novo Produto
             </Button>
           </DialogTrigger>
@@ -125,7 +172,15 @@ export default function ProductsPage() {
               <DialogTitle>Adicionar Novo Produto</DialogTitle>
               <DialogDescription>Preencha os detalhes do novo produto.</DialogDescription>
             </DialogHeader>
+<<<<<<< HEAD
             <ProductForm onSubmit={handleAddProduct} isLoading={addProductMutation.isPending} />
+=======
+            <ProductForm 
+              onSubmit={handleAddProduct} 
+              isLoading={addProductMutation.isPending}
+              defaultValues={addProductFormDefaultValues}
+            />
+>>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
           </DialogContent>
         </Dialog>
       </div>

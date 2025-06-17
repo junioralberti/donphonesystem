@@ -14,7 +14,7 @@ import { PlusCircle, Pencil, Trash2, FileText, Printer, UserPlus, Search, MinusC
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { getEstablishmentSettings, type EstablishmentSettings } from "@/services/settingsService";
-import { addServiceOrder, getServiceOrders, deleteServiceOrder, type ServiceOrder, type ServiceOrderInput, type SoldProductItemInput } from "@/services/serviceOrderService";
+import { addServiceOrder, getServiceOrders, deleteServiceOrder, type ServiceOrder, type ServiceOrderInput, type SoldProductItemInput, updateServiceOrder } from "@/services/serviceOrderService";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -29,17 +29,21 @@ type DeviceType = "Celular" | "Notebook" | "Tablet" | "Placa" | "Outro";
 const deviceTypes: DeviceType[] = ["Celular", "Notebook", "Tablet", "Placa", "Outro"];
 
 interface SoldProductItem extends SoldProductItemInput {
-  tempId: string; // Used for client-side list management before saving
+  tempId: string; 
 }
 
 
 export default function ServiceOrdersPage() {
   const [isNewServiceOrderDialogOpen, setIsNewServiceOrderDialogOpen] = useState(false);
+  const [isEditServiceOrderDialogOpen, setIsEditServiceOrderDialogOpen] = useState(false);
+  const [editingServiceOrder, setEditingServiceOrder] = useState<ServiceOrder | null>(null);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [establishmentDataForPrint, setEstablishmentDataForPrint] = useState<EstablishmentSettings | null>(null);
   
-  // States for the new OS form
+  const [formOsNumber, setFormOsNumber] = useState("Automático");
+  const [formOpeningDate, setFormOpeningDate] = useState(new Date().toLocaleString('pt-BR'));
   const [deliveryForecastDate, setDeliveryForecastDate] = useState("");
   const [status, setStatus] = useState<ServiceOrderStatus>("Aberta");
   const [responsibleTechnicianName, setResponsibleTechnicianName] = useState("");
@@ -71,7 +75,6 @@ export default function ServiceOrdersPage() {
             setEstablishmentDataForPrint(settings);
         } catch (error) {
             console.error("Failed to fetch establishment settings for print:", error);
-            // Fallback is handled directly in the print function
         }
     };
     fetchSettings();
@@ -92,33 +95,41 @@ export default function ServiceOrdersPage() {
       });
     }
   }, [serviceOrdersError, toast]);
+  
+  const populateFormForEdit = (order: ServiceOrder) => {
+    setFormOsNumber(order.osNumber);
+    setFormOpeningDate(order.openingDate instanceof Date ? order.openingDate.toLocaleString('pt-BR') : new Date(order.openingDate as any).toLocaleString('pt-BR'));
+    setDeliveryForecastDate(order.deliveryForecastDate ? format(new Date(order.deliveryForecastDate), "yyyy-MM-dd") : "");
+    setStatus(order.status);
+    setResponsibleTechnicianName(order.responsibleTechnicianName || "");
+    setClientName(order.clientName);
+    setClientCpfCnpj(order.clientCpfCnpj || "");
+    setClientPhone(order.clientPhone || "");
+    setClientEmail(order.clientEmail || "");
+    setDeviceType(order.deviceType || undefined);
+    setDeviceBrandModel(order.deviceBrandModel);
+    setDeviceImeiSerial(order.deviceImeiSerial || "");
+    setDeviceColor(order.deviceColor || "");
+    setDeviceAccessories(order.deviceAccessories || "");
+    setProblemReportedByClient(order.problemReportedByClient);
+    setTechnicalDiagnosis(order.technicalDiagnosis || "");
+    setInternalObservations(order.internalObservations || "");
+    setServicesPerformedDescription(order.servicesPerformedDescription || "");
+    setPartsUsedDescription(order.partsUsedDescription || "");
+    setServiceManualValueInput(order.serviceManualValue.toFixed(2).replace('.', ','));
+    setSoldProductsList(order.additionalSoldProducts.map(p => ({ ...p, tempId: `prod-${Math.random().toString(36).substr(2, 9)}` })) || []);
+    setGrandTotalDisplay(order.grandTotalValue.toFixed(2).replace('.', ','));
+  };
 
-  const addServiceOrderMutation = useMutation({
-    mutationFn: addServiceOrder,
-    onSuccess: (newOsNumber) => {
-      queryClient.invalidateQueries({ queryKey: ["serviceOrders"] });
-      toast({ title: "Nova O.S. Criada", description: `A Ordem de Serviço ${newOsNumber} foi registrada com sucesso.`});
-      resetFormFields();
-      setIsNewServiceOrderDialogOpen(false);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Erro ao Criar O.S.", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const deleteServiceOrderMutation = useMutation({
-    mutationFn: deleteServiceOrder,
-    onSuccess: (deletedOsId) => {
-      queryClient.invalidateQueries({ queryKey: ["serviceOrders"] });
-      toast({ title: "O.S. Excluída", description: `A Ordem de Serviço ${deletedOsId} foi excluída.`, variant: "default"});
-    },
-    onError: (error: Error) => {
-       toast({ title: "Erro ao Excluir O.S.", description: error.message, variant: "destructive" });
-    }
-  });
-
+  const handleOpenEditDialog = (order: ServiceOrder) => {
+    setEditingServiceOrder(order);
+    populateFormForEdit(order);
+    setIsEditServiceOrderDialogOpen(true);
+  };
 
   const resetFormFields = () => {
+    setFormOsNumber("Automático");
+    setFormOpeningDate(new Date().toLocaleString('pt-BR'));
     setDeliveryForecastDate("");
     setStatus("Aberta");
     setResponsibleTechnicianName("");
@@ -141,8 +152,47 @@ export default function ServiceOrdersPage() {
     setCurrentProductNameInput("");
     setCurrentProductQtyInput("1");
     setCurrentProductPriceInput("");
-    // grandTotalDisplay will be reset by useEffect
+    setEditingServiceOrder(null);
   };
+
+  const addServiceOrderMutation = useMutation({
+    mutationFn: addServiceOrder,
+    onSuccess: (newOsNumber) => {
+      queryClient.invalidateQueries({ queryKey: ["serviceOrders"] });
+      toast({ title: "Nova O.S. Criada", description: `A Ordem de Serviço ${newOsNumber} foi registrada com sucesso.`});
+      resetFormFields();
+      setIsNewServiceOrderDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao Criar O.S.", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateServiceOrderMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: Partial<Omit<ServiceOrder, 'id' | 'osNumber' | 'openingDate' | 'userId'>> }) => updateServiceOrder(id, data),
+    onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ["serviceOrders"] });
+        toast({ title: "O.S. Atualizada", description: `A Ordem de Serviço foi atualizada com sucesso.` });
+        resetFormFields();
+        setIsEditServiceOrderDialogOpen(false);
+    },
+    onError: (error: Error) => {
+        toast({ title: "Erro ao Atualizar O.S.", description: error.message, variant: "destructive" });
+    },
+  });
+
+
+  const deleteServiceOrderMutation = useMutation({
+    mutationFn: deleteServiceOrder,
+    onSuccess: (deletedOsId) => {
+      queryClient.invalidateQueries({ queryKey: ["serviceOrders"] });
+      toast({ title: "O.S. Excluída", description: `A Ordem de Serviço ${deletedOsId} foi excluída.`, variant: "default"});
+    },
+    onError: (error: Error) => {
+       toast({ title: "Erro ao Excluir O.S.", description: error.message, variant: "destructive" });
+    }
+  });
+
 
   const handleAddSoldProduct = () => {
     const name = currentProductNameInput.trim();
@@ -185,7 +235,7 @@ export default function ServiceOrdersPage() {
   }, [serviceManualValueInput, soldProductsList]);
 
 
-  const handleCreateServiceOrder = async (e: FormEvent) => {
+  const handleSubmitServiceOrder = async (e: FormEvent) => {
     e.preventDefault();
     if (!clientName || !deviceBrandModel || !problemReportedByClient) {
        toast({
@@ -199,10 +249,8 @@ export default function ServiceOrdersPage() {
     const serviceValueNum = parseFloat(serviceManualValueInput.replace(',', '.')) || 0;
     const grandTotalNum = parseFloat(grandTotalDisplay.replace(',', '.')) || 0;
 
-    const newOrderData: ServiceOrderInput = {
-      // osNumber will be generated by the service
-      // openingDate will be set by serverTimestamp in the service
-      deliveryForecastDate: deliveryForecastDate || null, // Store as null if empty
+    const orderDataPayload: ServiceOrderInput = {
+      deliveryForecastDate: deliveryForecastDate || null,
       status,
       responsibleTechnicianName: responsibleTechnicianName || null,
       clientName,
@@ -220,11 +268,15 @@ export default function ServiceOrdersPage() {
       servicesPerformedDescription: servicesPerformedDescription || null,
       partsUsedDescription: partsUsedDescription || null,
       serviceManualValue: serviceValueNum,
-      additionalSoldProducts: soldProductsList.map(({ tempId, ...prod}) => prod), // Remove tempId before saving
+      additionalSoldProducts: soldProductsList.map(({ tempId, ...prod}) => prod),
       grandTotalValue: grandTotalNum,
     };
     
-    addServiceOrderMutation.mutate(newOrderData);
+    if (editingServiceOrder && editingServiceOrder.id) {
+        updateServiceOrderMutation.mutate({ id: editingServiceOrder.id, data: orderDataPayload });
+    } else {
+        addServiceOrderMutation.mutate(orderDataPayload);
+    }
   };
 
   const handleDeleteServiceOrder = async (orderId: string) => {
@@ -243,8 +295,9 @@ export default function ServiceOrdersPage() {
       businessCnpj: "Seu CNPJ",
       businessPhone: "Seu Telefone",
       businessEmail: "Seu Email",
-      logoUrl: "https://placehold.co/180x60.png?text=Sua+Logo"
     };
+    // Use fixed local logo
+    const fixedLogoUrl = "/donphone-login-visual.png";
 
     const printWindow = window.open('', '_blank', 'height=700,width=800');
     if (printWindow) {
@@ -258,18 +311,12 @@ export default function ServiceOrdersPage() {
         .logo-container img { max-height: 60px; max-width: 180px; object-fit: contain; }
         .establishment-info { font-size: 9pt; line-height: 1.4; }
         .establishment-info strong { font-size: 12pt; display: block; margin-bottom: 4px; color: #000; }
-        .section-title { font-size: 12pt; font-weight: bold; margin-top: 20px; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #eee; color: #000; }
-        .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 15px; margin-bottom: 15px; font-size: 9pt; }
-        .details-grid-full { display: grid; grid-template-columns: 1fr; gap: 4px; margin-bottom: 15px; font-size: 9pt; }
-        .details-grid div, .details-grid-full div { padding: 2px 0; }
-        .details-grid strong, .details-grid-full strong { color: #555; }
-        .products-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9pt; }
-        .products-table th, .products-table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
-        .products-table th { background-color: #f2f2f2; font-weight: bold; }
-        .products-table .text-right { text-align: right; }
-        .products-table .text-center { text-align: center; }
+        .section-title { font-size: 12pt; font-weight: bold; margin-top: 15px; margin-bottom: 6px; padding-bottom: 3px; border-bottom: 1px solid #eee; color: #000; }
+        .details-grid { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin-bottom: 10px; font-size: 9pt; }
+        .details-grid div { padding: 1px 0; }
+        .details-grid strong { color: #555; font-weight: bold; }
+        .text-area-content { white-space: pre-wrap; padding: 5px; border: 1px solid #eee; background-color: #f9f9f9; border-radius: 3px; font-size: 9pt; margin-top: 3px; min-height: 40px; }
         .grand-total { text-align: right; font-size: 11pt; font-weight: bold; margin-top: 15px; padding-top:10px; border-top: 1px solid #ccc; }
-        .text-area-content { white-space: pre-wrap; padding: 5px; border: 1px solid #eee; background-color: #f9f9f9; border-radius: 3px; font-size: 9pt; margin-top: 3px; min-height: 30px; }
         .signature-area { margin-top: 50px; padding-top: 20px; border-top: 1px dashed #aaa; text-align: center; font-size: 9pt; }
         .signature-line { display: inline-block; width: 280px; border-bottom: 1px solid #333; margin-top: 40px; }
         h1.os-title { text-align: center; font-size: 16pt; margin-bottom: 15px; color: #000;}
@@ -277,10 +324,7 @@ export default function ServiceOrdersPage() {
       printWindow.document.write('</style></head><body><div class="print-container">');
 
       printWindow.document.write('<div class="establishment-header">');
-      if (establishmentDataToUse.logoUrl) {
-        const logoHint = establishmentDataToUse.logoUrl.includes('placehold.co') ? 'data-ai-hint="company logo placeholder"' : 'data-ai-hint="company logo"';
-        printWindow.document.write(`<div class="logo-container"><img src="${establishmentDataToUse.logoUrl}" alt="Logo do Estabelecimento" ${logoHint} /></div>`);
-      }
+      printWindow.document.write(`<div class="logo-container"><img src="${fixedLogoUrl}" alt="Logo do Estabelecimento" data-ai-hint="company brand illustration" /></div>`);
       printWindow.document.write('<div class="establishment-info">');
       printWindow.document.write(`<strong>${establishmentDataToUse.businessName || "Nome da Empresa"}</strong><br/>`);
       printWindow.document.write(`${establishmentDataToUse.businessAddress || "Endereço da Empresa"}<br/>`);
@@ -291,79 +335,28 @@ export default function ServiceOrdersPage() {
       printWindow.document.write('</div></div>');
 
       printWindow.document.write(`<h1 class="os-title">ORDEM DE SERVIÇO Nº: ${order.osNumber || 'N/A'}</h1>`);
-
-      printWindow.document.write('<div class="section-title">Detalhes da OS</div>');
-      printWindow.document.write('<div class="details-grid">');
-      const openingDateFormatted = order.openingDate instanceof Date ? format(order.openingDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : (order.openingDate || 'N/A');
+      
+      const openingDateFormatted = order.openingDate instanceof Date 
+        ? format(order.openingDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) 
+        : (order.openingDate ? new Date(String(order.openingDate)).toLocaleString('pt-BR') : 'N/A');
+      printWindow.document.write('<div class="details-grid" style="grid-template-columns: 1fr; margin-bottom: 10px;">');
       printWindow.document.write(`<div><strong>Data de Abertura:</strong> ${openingDateFormatted}</div>`);
-      
-      let formattedDeliveryDate = "N/D";
-      if (order.deliveryForecastDate) {
-        try {
-          const date = new Date(String(order.deliveryForecastDate) + 'T00:00:00'); // Ensure it's local
-          if (!isNaN(date.getTime())) {
-            formattedDeliveryDate = format(date, "dd/MM/yyyy", { locale: ptBR });
-          }
-        } catch (e) { console.error("Error formatting delivery forecast date:", e); }
-      }
-      printWindow.document.write(`<div><strong>Previsão de Entrega:</strong> ${formattedDeliveryDate}</div>`);
-      printWindow.document.write(`<div><strong>Status:</strong> ${order.status || 'N/A'}</div>`);
-      if (order.responsibleTechnicianName) {
-        printWindow.document.write(`<div><strong>Técnico Responsável:</strong> ${order.responsibleTechnicianName}</div>`);
-      }
       printWindow.document.write('</div>');
-
-      printWindow.document.write('<div class="section-title">Dados do Cliente</div>');
-      printWindow.document.write('<div class="details-grid-full">');
+      
+      printWindow.document.write('<div class="section-title">Cliente</div>');
+      printWindow.document.write('<div class="details-grid" style="grid-template-columns: 1fr;">');
       printWindow.document.write(`<div><strong>Nome:</strong> ${order.clientName || 'N/A'}</div>`);
-      if (order.clientCpfCnpj) printWindow.document.write(`<div><strong>CPF/CNPJ:</strong> ${order.clientCpfCnpj}</div>`);
-      if (order.clientPhone) printWindow.document.write(`<div><strong>Telefone/WhatsApp:</strong> ${order.clientPhone}</div>`);
-      if (order.clientEmail) printWindow.document.write(`<div><strong>E-mail:</strong> ${order.clientEmail}</div>`);
       printWindow.document.write('</div>');
 
-      printWindow.document.write('<div class="section-title">Informações do Aparelho</div>');
-      printWindow.document.write('<div class="details-grid">');
-      if (order.deviceType) printWindow.document.write(`<div><strong>Tipo:</strong> ${order.deviceType}</div>`);
+      printWindow.document.write('<div class="section-title">Equipamento</div>');
+      printWindow.document.write('<div class="details-grid" style="grid-template-columns: 1fr;">');
       printWindow.document.write(`<div><strong>Marca/Modelo:</strong> ${order.deviceBrandModel || 'N/A'}</div>`);
-      if (order.deviceImeiSerial) printWindow.document.write(`<div><strong>IMEI/Nº Série:</strong> ${order.deviceImeiSerial}</div>`);
-      if (order.deviceColor) printWindow.document.write(`<div><strong>Cor:</strong> ${order.deviceColor}</div>`);
-      if (order.deviceAccessories) printWindow.document.write(`<div style="grid-column: span 2;"><strong>Acessórios Recebidos:</strong> <div class="text-area-content">${order.deviceAccessories}</div></div>`);
-      else printWindow.document.write(`<div style="grid-column: span 2;"><strong>Acessórios Recebidos:</strong> <div class="text-area-content">Nenhum</div></div>`);
-      printWindow.document.write('</div>');
-      
-      printWindow.document.write('<div class="section-title">Problemas e Diagnóstico</div>');
-      printWindow.document.write('<div class="details-grid-full">');
-      printWindow.document.write(`<div><strong>Defeito Informado pelo Cliente:</strong> <div class="text-area-content">${order.problemReportedByClient || 'N/A'}</div></div>`);
-      if (order.technicalDiagnosis) printWindow.document.write(`<div><strong>Diagnóstico Técnico:</strong> <div class="text-area-content">${order.technicalDiagnosis}</div></div>`);
-      if (order.internalObservations) printWindow.document.write(`<div><strong>Observações Internas:</strong> <div class="text-area-content">${order.internalObservations}</div></div>`);
       printWindow.document.write('</div>');
 
-      if (order.servicesPerformedDescription || order.partsUsedDescription) {
-        printWindow.document.write('<div class="section-title">Serviços Executados e Peças Utilizadas</div>');
-        printWindow.document.write('<div class="details-grid-full">');
-        if (order.servicesPerformedDescription) printWindow.document.write(`<div><strong>Serviços Executados:</strong> <div class="text-area-content">${order.servicesPerformedDescription}</div></div>`);
-        if (order.partsUsedDescription) printWindow.document.write(`<div><strong>Produtos/Peças Utilizadas:</strong> <div class="text-area-content">${order.partsUsedDescription}</div></div>`);
-        printWindow.document.write('</div>');
-      }
-      
-      printWindow.document.write('<div class="section-title">Valores</div>');
-      printWindow.document.write('<div class="details-grid-full">');
-      printWindow.document.write(`<div><strong>Valor do Serviço:</strong> R$ ${(order.serviceManualValue !== undefined ? Number(order.serviceManualValue).toFixed(2).replace('.', ',') : '0,00')}</div>`);
+      printWindow.document.write('<div class="section-title">Problema Relatado</div>');
+      printWindow.document.write('<div class="text-area-content">');
+      printWindow.document.write(order.problemReportedByClient || 'Nenhum problema relatado.');
       printWindow.document.write('</div>');
-
-      if (order.additionalSoldProducts && order.additionalSoldProducts.length > 0) {
-        printWindow.document.write('<div class="section-title" style="margin-top:10px; margin-bottom: 5px;">Produtos Adicionais Vendidos</div>');
-        printWindow.document.write('<table class="products-table"><thead><tr><th>Produto</th><th class="text-center">Qtd</th><th class="text-right">Preço Unit.</th><th class="text-right">Subtotal</th></tr></thead><tbody>');
-        order.additionalSoldProducts.forEach(prod => {
-          printWindow.document.write(`<tr>
-            <td>${prod.name}</td>
-            <td class="text-center">${prod.quantity}</td>
-            <td class="text-right">R$ ${Number(prod.unitPrice).toFixed(2).replace('.', ',')}</td>
-            <td class="text-right">R$ ${Number(prod.totalPrice).toFixed(2).replace('.', ',')}</td>
-          </tr>`);
-        });
-        printWindow.document.write('</tbody></table>');
-      }
       
       printWindow.document.write(`<div class="grand-total">VALOR TOTAL DA OS: R$ ${order.grandTotalValue !== undefined ? Number(order.grandTotalValue).toFixed(2).replace('.', ',') : '0,00'}</div>`);
 
@@ -386,13 +379,13 @@ export default function ServiceOrdersPage() {
   
   const getStatusColor = (status: ServiceOrderStatus) => {
     switch (status) {
-      case "Aberta": return "bg-yellow-100 text-yellow-800 border border-yellow-300";
-      case "Em andamento": return "bg-blue-100 text-blue-800 border border-blue-300";
-      case "Aguardando peça": return "bg-orange-100 text-orange-800 border border-orange-300";
-      case "Concluída": return "bg-green-100 text-green-800 border border-green-300";
-      case "Entregue": return "bg-teal-100 text-teal-800 border border-teal-300";
-      case "Cancelada": return "bg-red-100 text-red-800 border border-red-300";
-      default: return "bg-gray-100 text-gray-800 border border-gray-300";
+      case "Aberta": return "bg-primary/10 text-primary border-primary/30";
+      case "Em andamento": return "bg-blue-500/10 text-blue-400 border-blue-500/30"; 
+      case "Aguardando peça": return "bg-orange-500/10 text-orange-400 border-orange-500/30";
+      case "Concluída": return "bg-green-500/10 text-green-400 border-green-500/30";
+      case "Entregue": return "bg-teal-500/10 text-teal-400 border-teal-500/30";
+      case "Cancelada": return "bg-destructive/10 text-destructive border-destructive/30";
+      default: return "bg-muted text-muted-foreground border-border";
     }
   };
   
@@ -401,14 +394,14 @@ export default function ServiceOrdersPage() {
       {[...Array(5)].map((_, i) => (
          <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
           <div className="space-y-1.5 w-2/3">
-            <Skeleton className="h-5 w-1/3 rounded" />
-            <Skeleton className="h-4 w-2/3 rounded" />
-             <Skeleton className="h-3 w-1/2 rounded" />
+            <Skeleton className="h-5 w-1/3 rounded bg-muted/50" />
+            <Skeleton className="h-4 w-2/3 rounded bg-muted/50" />
+             <Skeleton className="h-3 w-1/2 rounded bg-muted/50" />
           </div>
           <div className="flex items-center space-x-2">
-            <Skeleton className="h-9 w-9 rounded-md" />
-            <Skeleton className="h-9 w-9 rounded-md" />
-            <Skeleton className="h-9 w-9 rounded-md" />
+            <Skeleton className="h-9 w-9 rounded-md bg-muted/50" />
+            <Skeleton className="h-9 w-9 rounded-md bg-muted/50" />
+            <Skeleton className="h-9 w-9 rounded-md bg-muted/50" />
           </div>
         </div>
       ))}
@@ -419,36 +412,37 @@ export default function ServiceOrdersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-headline text-3xl font-semibold">Ordens de Serviço</h1>
+        <h1 className="font-headline text-3xl font-semibold text-foreground">Ordens de Serviço</h1>
         <Dialog open={isNewServiceOrderDialogOpen} onOpenChange={(isOpen) => {
           setIsNewServiceOrderDialogOpen(isOpen);
-          if (!isOpen) resetFormFields();
+          if (!isOpen) resetFormFields(); 
         }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => { resetFormFields(); setIsNewServiceOrderDialogOpen(true); }} className="bg-accent hover:bg-accent/90 text-accent-foreground">
               <PlusCircle className="mr-2 h-4 w-4" /> Criar Nova Ordem de Serviço
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
             <DialogHeader>
-              <DialogTitle>Nova Ordem de Serviço</DialogTitle>
-              <DialogDescription>Preencha os dados para registrar uma nova O.S.</DialogDescription>
+              <DialogTitle>{editingServiceOrder ? "Editar Ordem de Serviço" : "Nova Ordem de Serviço"}</DialogTitle>
+              <DialogDescription>
+                {editingServiceOrder ? "Atualize os dados da O.S." : "Preencha os dados para registrar uma nova O.S."}
+              </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreateServiceOrder}>
+            <form onSubmit={handleSubmitServiceOrder}>
               <ScrollArea className="h-[75vh] p-1 pr-3">
                 <div className="space-y-6 p-2">
-                  {/* Campos Gerais da OS */}
                   <Card>
                     <CardHeader><CardTitle className="text-xl">Dados Gerais da OS</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <Label htmlFor="osNumber">Número da OS</Label>
-                          <Input id="osNumber" value="Automático" disabled className="bg-muted/50" />
+                          <Label htmlFor="osNumberForm">Número da OS</Label>
+                          <Input id="osNumberForm" value={formOsNumber} disabled className="bg-muted/50" />
                         </div>
                         <div>
-                          <Label htmlFor="osOpeningDate">Data de Abertura</Label>
-                          <Input id="osOpeningDate" value={new Date().toLocaleString('pt-BR')} disabled className="bg-muted/50" />
+                          <Label htmlFor="osOpeningDateForm">Data de Abertura</Label>
+                          <Input id="osOpeningDateForm" value={formOpeningDate} disabled className="bg-muted/50" />
                         </div>
                         <div>
                           <Label htmlFor="osDeliveryForecast">Previsão de Entrega</Label>
@@ -478,25 +472,18 @@ export default function ServiceOrdersPage() {
                     </CardContent>
                   </Card>
 
-                  {/* Dados do Cliente */}
                   <Card>
                     <CardHeader><CardTitle className="text-xl">Dados do Cliente</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
                        <div className="space-y-1">
                         <Label htmlFor="osClientName">Cliente (Nome Completo)</Label>
-                        <div className="flex gap-2">
-                            <Input 
-                                id="osClientName" 
-                                value={clientName} 
-                                onChange={(e) => setClientName(e.target.value)} 
-                                placeholder="Digite o nome do cliente"
-                                required 
-                            />
-                             {/* <Button type="button" variant="outline" size="icon" onClick={() => alert("Funcionalidade de busca/cadastro rápido de cliente pendente.")} aria-label="Buscar ou Cadastrar Cliente">
-                                <Search className="h-4 w-4" />
-                            </Button> */}
-                        </div>
-                        {/* <p className="text-xs text-muted-foreground">Busca de clientes existentes e cadastro rápido serão implementados.</p> */}
+                        <Input 
+                            id="osClientName" 
+                            value={clientName} 
+                            onChange={(e) => setClientName(e.target.value)} 
+                            placeholder="Digite o nome do cliente"
+                            required 
+                        />
                        </div>
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -515,7 +502,6 @@ export default function ServiceOrdersPage() {
                     </CardContent>
                   </Card>
 
-                  {/* Informações do Aparelho */}
                   <Card>
                     <CardHeader><CardTitle className="text-xl">Informações do Aparelho</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
@@ -551,7 +537,6 @@ export default function ServiceOrdersPage() {
                     </CardContent>
                   </Card>
 
-                  {/* Problemas e Diagnóstico */}
                   <Card>
                     <CardHeader><CardTitle className="text-xl">Problemas e Diagnóstico</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
@@ -641,7 +626,7 @@ export default function ServiceOrdersPage() {
                                     />
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <Button type="button" onClick={handleAddSoldProduct} className="w-full">
+                                    <Button type="button" onClick={handleAddSoldProduct} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
                                         <PlusCircle className="mr-2 h-4 w-4" /> Add
                                     </Button>
                                 </div>
@@ -684,7 +669,7 @@ export default function ServiceOrdersPage() {
                         
                         <div className="mt-6 text-right">
                             <p className="text-lg font-semibold">
-                                Valor Total da OS: <span className="text-primary">R$ {grandTotalDisplay}</span>
+                                Valor Total da OS: <span className="text-accent">R$ {grandTotalDisplay}</span>
                             </p>
                         </div>
                     </CardContent>
@@ -694,26 +679,313 @@ export default function ServiceOrdersPage() {
               </ScrollArea>
               <DialogFooter className="border-t pt-6 mt-6 pr-4 flex flex-col sm:flex-row justify-between items-center w-full">
                 <Button type="button" variant="outline" onClick={() => handlePrintOS({
-                    osNumber: "PREVISUALIZAÇÃO" , 
-                    openingDate: new Date(), // Use Date object for formatting
-                    clientName, deviceBrandModel, problemReportedByClient, status, 
-                    deliveryForecastDate, responsibleTechnicianName,
-                    clientCpfCnpj, clientPhone, clientEmail,
-                    deviceType, deviceImeiSerial, deviceColor, deviceAccessories, technicalDiagnosis, internalObservations,
-                    servicesPerformedDescription, partsUsedDescription,
-                    serviceManualValue: parseFloat(serviceManualValueInput.replace(',', '.')) || 0,
-                    additionalSoldProducts: soldProductsList.map(({tempId, ...rest}) => rest),
+                    osNumber: editingServiceOrder ? editingServiceOrder.osNumber : "PREVISUALIZAÇÃO", 
+                    openingDate: editingServiceOrder ? editingServiceOrder.openingDate : new Date(),
+                    clientName, deviceBrandModel, problemReportedByClient, 
                     grandTotalValue: parseFloat(grandTotalDisplay.replace(',', '.')) || 0,
                 })}>
                     <Printer className="mr-2 h-4 w-4" /> Imprimir OS (Via Cliente)
                 </Button>
                 <div className="flex gap-2 mt-4 sm:mt-0">
                     <DialogClose asChild>
-                        <Button type="button" variant="ghost">Cancelar</Button>
+                        <Button type="button" variant="ghost" onClick={() => { 
+                            setIsNewServiceOrderDialogOpen(false); 
+                            setIsEditServiceOrderDialogOpen(false); 
+                            resetFormFields(); 
+                        }}>
+                            Cancelar
+                        </Button>
                     </DialogClose>
-                    <Button type="submit" disabled={addServiceOrderMutation.isPending}>
-                      {addServiceOrderMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Criar O.S.
+                    <Button type="submit" disabled={addServiceOrderMutation.isPending || updateServiceOrderMutation.isPending} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                      {(addServiceOrderMutation.isPending || updateServiceOrderMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {editingServiceOrder ? "Salvar Alterações" : "Criar O.S."}
+                    </Button>
+                </div>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditServiceOrderDialogOpen} onOpenChange={(isOpen) => {
+          setIsEditServiceOrderDialogOpen(isOpen);
+          if (!isOpen) resetFormFields(); 
+        }}>
+             <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Editar Ordem de Serviço</DialogTitle>
+              <DialogDescription>
+                Atualize os dados da O.S.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmitServiceOrder}>
+              <ScrollArea className="h-[75vh] p-1 pr-3">
+                <div className="space-y-6 p-2">
+                  <Card>
+                    <CardHeader><CardTitle className="text-xl">Dados Gerais da OS</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor="osNumberFormEdit">Número da OS</Label>
+                          <Input id="osNumberFormEdit" value={formOsNumber} disabled className="bg-muted/50" />
+                        </div>
+                        <div>
+                          <Label htmlFor="osOpeningDateFormEdit">Data de Abertura</Label>
+                          <Input id="osOpeningDateFormEdit" value={formOpeningDate} disabled className="bg-muted/50" />
+                        </div>
+                        <div>
+                          <Label htmlFor="osDeliveryForecastEdit">Previsão de Entrega</Label>
+                          <Input id="osDeliveryForecastEdit" type="date" value={deliveryForecastDate} onChange={(e) => setDeliveryForecastDate(e.target.value)} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="osStatusEdit">Status da OS</Label>
+                          <Select value={status} onValueChange={(value: ServiceOrderStatus) => setStatus(value)}>
+                            <SelectTrigger id="osStatusEdit"><SelectValue placeholder="Selecione o status" /></SelectTrigger>
+                            <SelectContent>
+                              {serviceOrderStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="osTechnicianEdit">Técnico Responsável</Label>
+                           <Input 
+                                id="osTechnicianEdit" 
+                                value={responsibleTechnicianName}
+                                onChange={(e) => setResponsibleTechnicianName(e.target.value)}
+                                placeholder="Nome do técnico" 
+                            />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader><CardTitle className="text-xl">Dados do Cliente</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                       <div className="space-y-1">
+                        <Label htmlFor="osClientNameEdit">Cliente (Nome Completo)</Label>
+                        <Input 
+                            id="osClientNameEdit" 
+                            value={clientName} 
+                            onChange={(e) => setClientName(e.target.value)} 
+                            placeholder="Digite o nome do cliente"
+                            required 
+                        />
+                       </div>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="osClientCpfCnpjEdit">CPF/CNPJ (Opcional)</Label>
+                            <Input id="osClientCpfCnpjEdit" value={clientCpfCnpj} onChange={(e) => setClientCpfCnpj(e.target.value)} placeholder="000.000.000-00 ou 00.000.000/0001-00" />
+                        </div>
+                        <div>
+                            <Label htmlFor="osClientPhoneEdit">Telefone/WhatsApp (Opcional)</Label>
+                            <Input id="osClientPhoneEdit" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="(00) 00000-0000" />
+                        </div>
+                       </div>
+                       <div>
+                        <Label htmlFor="osClientEmailEdit">E-mail (Opcional)</Label>
+                        <Input id="osClientEmailEdit" type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="cliente@email.com" />
+                       </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader><CardTitle className="text-xl">Informações do Aparelho</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="osDeviceTypeEdit">Tipo de Aparelho</Label>
+                          <Select value={deviceType} onValueChange={(value: DeviceType) => setDeviceType(value)}>
+                            <SelectTrigger id="osDeviceTypeEdit"><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
+                            <SelectContent>
+                              {deviceTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="osDeviceBrandModelEdit">Marca/Modelo</Label>
+                          <Input id="osDeviceBrandModelEdit" value={deviceBrandModel} onChange={(e) => setDeviceBrandModel(e.target.value)} placeholder="Ex: Samsung A20, iPhone 11" required />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="osDeviceImeiSerialEdit">IMEI / Número de Série (Opcional)</Label>
+                          <Input id="osDeviceImeiSerialEdit" value={deviceImeiSerial} onChange={(e) => setDeviceImeiSerial(e.target.value)} placeholder="IMEI ou N/S" />
+                        </div>
+                        <div>
+                          <Label htmlFor="osDeviceColorEdit">Cor (Opcional)</Label>
+                          <Input id="osDeviceColorEdit" value={deviceColor} onChange={(e) => setDeviceColor(e.target.value)} placeholder="Ex: Preto, Azul" />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="osDeviceAccessoriesEdit">Acessórios Recebidos (Opcional)</Label>
+                        <Input id="osDeviceAccessoriesEdit" value={deviceAccessories} onChange={(e) => setDeviceAccessories(e.target.value)} placeholder="Ex: Fonte, cabo, fone, capinha" />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader><CardTitle className="text-xl">Problemas e Diagnóstico</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label htmlFor="osProblemReportedEdit">Defeito Informado pelo Cliente</Label>
+                        <Textarea 
+                          id="osProblemReportedEdit" 
+                          value={problemReportedByClient} 
+                          onChange={(e) => setProblemReportedByClient(e.target.value)} 
+                          placeholder="Ex: Não liga, tela quebrada, bateria viciada..."
+                          rows={3}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="osTechnicalDiagnosisEdit">Diagnóstico Técnico (Opcional)</Label>
+                        <Textarea id="osTechnicalDiagnosisEdit" value={technicalDiagnosis} onChange={(e) => setTechnicalDiagnosis(e.target.value)} placeholder="Detalhes do diagnóstico técnico..." rows={3} />
+                      </div>
+                       <div>
+                        <Label htmlFor="osInternalObservationsEdit">Observações Internas (Opcional)</Label>
+                        <Textarea id="osInternalObservationsEdit" value={internalObservations} onChange={(e) => setInternalObservations(e.target.value)} placeholder="Notas internas, ex: aguardando aprovação do orçamento..." rows={2} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader><CardTitle className="text-xl">Serviços e Peças (Descritivo)</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label htmlFor="osServicesPerformedEdit">Serviços Executados (Descrição)</Label>
+                            <Textarea id="osServicesPerformedEdit" value={servicesPerformedDescription} onChange={(e) => setServicesPerformedDescription(e.target.value)} placeholder="Descreva os serviços realizados..." rows={3} />
+                        </div>
+                        <div>
+                            <Label htmlFor="osPartsUsedEdit">Produtos/Peças Utilizadas (Descrição)</Label>
+                            <Textarea id="osPartsUsedEdit" value={partsUsedDescription} onChange={(e) => setPartsUsedDescription(e.target.value)} placeholder="Liste as peças utilizadas..." rows={3} />
+                        </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                        <CardTitle className="text-xl">Valores e Produtos Adicionais</CardTitle>
+                        <CardDescription>Insira o valor do serviço e adicione produtos vendidos à parte.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div>
+                            <Label htmlFor="osServiceManualValueEdit">Valor do Serviço (R$)</Label>
+                            <Input 
+                                id="osServiceManualValueEdit" 
+                                type="text" 
+                                value={serviceManualValueInput} 
+                                onChange={(e) => setServiceManualValueInput(e.target.value.replace(/[^0-9,]/g, ''))} 
+                                placeholder="Ex: 150,00" 
+                            />
+                        </div>
+                        
+                        <div className="space-y-4 rounded-md border p-4">
+                            <h4 className="font-medium">Adicionar Produto à OS</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                                <div className="sm:col-span-5">
+                                    <Label htmlFor="currentProductNameEdit">Nome do Produto</Label>
+                                    <Input 
+                                        id="currentProductNameEdit" 
+                                        value={currentProductNameInput} 
+                                        onChange={(e) => setCurrentProductNameInput(e.target.value)} 
+                                        placeholder="Ex: Película de Vidro"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <Label htmlFor="currentProductQtyEdit">Qtd.</Label>
+                                    <Input 
+                                        id="currentProductQtyEdit" 
+                                        type="number" 
+                                        value={currentProductQtyInput} 
+                                        onChange={(e) => setCurrentProductQtyInput(e.target.value)} 
+                                        min="1"
+                                    />
+                                </div>
+                                <div className="sm:col-span-3">
+                                    <Label htmlFor="currentProductPriceEdit">Preço Unit. (R$)</Label>
+                                    <Input 
+                                        id="currentProductPriceEdit" 
+                                        type="text" 
+                                        value={currentProductPriceInput} 
+                                        onChange={(e) => setCurrentProductPriceInput(e.target.value.replace(/[^0-9,]/g, ''))} 
+                                        placeholder="Ex: 25,00"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                     <Button type="button" onClick={handleAddSoldProduct} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                                        <PlusCircle className="mr-2 h-4 w-4" /> Add
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {soldProductsList.length > 0 && (
+                                <div className="mt-4 space-y-2">
+                                    <h5 className="text-sm font-medium">Produtos Adicionados:</h5>
+                                    <div className="rounded-md border">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Produto</TableHead>
+                                                    <TableHead className="text-center">Qtd</TableHead>
+                                                    <TableHead className="text-right">Unit. (R$)</TableHead>
+                                                    <TableHead className="text-right">Total (R$)</TableHead>
+                                                    <TableHead className="w-[50px]"></TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {soldProductsList.map(prod => (
+                                                    <TableRow key={prod.tempId}>
+                                                        <TableCell>{prod.name}</TableCell>
+                                                        <TableCell className="text-center">{prod.quantity}</TableCell>
+                                                        <TableCell className="text-right">{Number(prod.unitPrice).toFixed(2).replace('.', ',')}</TableCell>
+                                                        <TableCell className="text-right">{Number(prod.totalPrice).toFixed(2).replace('.', ',')}</TableCell>
+                                                        <TableCell>
+                                                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleRemoveSoldProduct(prod.tempId)}>
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="mt-6 text-right">
+                            <p className="text-lg font-semibold">
+                                Valor Total da OS: <span className="text-accent">R$ {grandTotalDisplay}</span>
+                            </p>
+                        </div>
+                    </CardContent>
+                  </Card>
+
+                </div>
+              </ScrollArea>
+              <DialogFooter className="border-t pt-6 mt-6 pr-4 flex flex-col sm:flex-row justify-between items-center w-full">
+                <Button type="button" variant="outline" onClick={() => handlePrintOS({
+                    osNumber: editingServiceOrder ? editingServiceOrder.osNumber : "PREVISUALIZAÇÃO", 
+                    openingDate: editingServiceOrder ? editingServiceOrder.openingDate : new Date(),
+                    clientName, deviceBrandModel, problemReportedByClient, 
+                    grandTotalValue: parseFloat(grandTotalDisplay.replace(',', '.')) || 0,
+                })}>
+                    <Printer className="mr-2 h-4 w-4" /> Imprimir OS (Via Cliente)
+                </Button>
+                <div className="flex gap-2 mt-4 sm:mt-0">
+                    <DialogClose asChild>
+                        <Button type="button" variant="ghost" onClick={() => { 
+                            setIsEditServiceOrderDialogOpen(false); 
+                            resetFormFields(); 
+                        }}>
+                            Cancelar
+                        </Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={updateServiceOrderMutation.isPending} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                      {updateServiceOrderMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Salvar Alterações
                     </Button>
                 </div>
               </DialogFooter>
@@ -772,7 +1044,7 @@ export default function ServiceOrdersPage() {
                         </span>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
-                        {os.openingDate instanceof Date ? format(os.openingDate, "dd/MM/yy HH:mm", { locale: ptBR }) : 'N/D'}
+                        {os.openingDate instanceof Date ? format(os.openingDate, "dd/MM/yy HH:mm", { locale: ptBR }) : (os.openingDate ? new Date(String(os.openingDate)).toLocaleDateString('pt-BR') : 'N/D')}
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
                         {os.deliveryForecastDate ? format(new Date(String(os.deliveryForecastDate) + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR }) : "N/D"}
@@ -782,7 +1054,7 @@ export default function ServiceOrdersPage() {
                         <Button variant="outline" size="icon" onClick={() => handlePrintOS(os)} aria-label="Imprimir ordem de serviço" disabled={!os.id}>
                           <Printer className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="icon" onClick={() => alert(`Visualizar/Editar OS ${os.osNumber} - funcionalidade pendente`)} aria-label="Editar ordem de serviço" disabled>
+                        <Button variant="outline" size="icon" onClick={() => handleOpenEditDialog(os)} aria-label="Editar ordem de serviço" disabled={!os.id}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                          <AlertDialog>
@@ -818,3 +1090,5 @@ export default function ServiceOrdersPage() {
     </div>
   );
 }
+
+    

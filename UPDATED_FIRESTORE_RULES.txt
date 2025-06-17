@@ -10,67 +10,75 @@ service cloud.firestore {
     }
 
     // Helper function to check if user is an admin
-    // Assumes a custom claim 'role' is set on the auth token
     function isAdmin() {
       return isAuthenticated() && request.auth.token.role == 'admin';
     }
-
-    // Helper function to check if user is a standard user or admin
-    function isUserOrAdmin() {
-      return isAuthenticated() && (request.auth.token.role == 'user' || request.auth.token.role == 'admin');
+    
+    // Helper function to check if the user is the owner of the document
+    // (assumes document has a 'userId' field)
+    // This function will no longer be generally applicable if userId is removed from data.
+    // Keeping it for the /users collection as it's relevant there.
+    function isOwner(docUserId) {
+      return isAuthenticated() && request.auth.uid == docUserId;
     }
 
-    // Helper function to check if the user is the owner of the document
-    function isOwner(userId) {
-      return request.auth.uid == userId;
+    // Helper function for create operations (resource.data does not exist yet)
+    // This function will no longer be generally applicable if userId is removed from data.
+    // Keeping it for the /users collection.
+    function isCreatingOwner() {
+      return isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Users Collection (Remains as is, relies on userId in path and specific fields)
+    match /users/{userId} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow create: if isAdmin(); 
+      allow update: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow delete: if isAdmin();
     }
 
     // Clients Collection
     match /clients/{clientId} {
-      // CHANGED: Now any authenticated user can create, read, update, and delete clients
-      allow read, create, update, delete: if isUserOrAdmin();
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated(); // Or isAdmin() for more restriction
     }
 
     // Products Collection
     match /products/{productId} {
-      // CHANGED: Now any authenticated user can create, read, update, and delete products
-      allow read, create, update, delete: if isUserOrAdmin();
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated(); // Or isAdmin() for more restriction
     }
 
     // Providers Collection
     match /providers/{providerId} {
-      // CHANGED: Now any authenticated user can create, read, update, and delete providers
-      allow read, create, update, delete: if isUserOrAdmin();
-    }
-
-    // Users Collection
-    // KEPT AS IS: User management remains restricted for security.
-    match /users/{userId} {
-      allow read: if isAdmin() || (isAuthenticated() && isOwner(userId));
-      allow create: if isAdmin();
-      allow update: if isAdmin() || (isAuthenticated() && isOwner(userId));
-      allow delete: if isAdmin();
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated(); // Or isAdmin() for more restriction
     }
 
     // Service Orders Collection
     match /serviceOrders/{orderId} {
-      // CHANGED: Now any authenticated user can create, read, update, and delete service orders
-      allow read, create, update, delete: if isUserOrAdmin();
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated(); // Or isAdmin() for more restriction
     }
 
     // Sales Collection
     match /sales/{saleId} {
-      // CHANGED: Now any authenticated user can create, read, update, and delete sales
-      allow read, create, update, delete: if isUserOrAdmin();
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated(); // Or isAdmin() for more restriction
+    }
+    
+    // Expenses Collection
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated(); // Or isAdmin() for more restriction
     }
 
-    // System Settings (Establishment Details)
+    // System Settings (Establishment Details) - Remains global, managed by admin/user
     match /systemSettings/establishmentDetails {
-      // CHANGED: Now any authenticated user with role 'admin' or 'user' can read and write
-      allow read, write: if isUserOrAdmin();
+       allow read, write: if isAuthenticated() && (request.auth.token.role == 'admin' || request.auth.token.role == 'user');
     }
 
-    // Default deny all other paths - good practice
+    // Default deny all other paths
     match /{document=**} {
       allow read, write: if false;
     }
