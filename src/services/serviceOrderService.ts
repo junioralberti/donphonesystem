@@ -120,3 +120,75 @@ export const deleteServiceOrder = async (id: string): Promise<string> => {
 
   return id;
 };
+
+//
+// 🧾 Funções de Relatórios com Supabase
+//
+
+// 1. Buscar OSs por intervalo de datas e status
+export const getServiceOrdersByDateRangeAndStatus = async (
+  startDate?: Date,
+  endDate?: Date,
+  status?: ServiceOrderStatus | "Todos"
+): Promise<ServiceOrder[]> => {
+  let queryBuilder = supabase.from(SERVICE_ORDERS_TABLE).select('*');
+
+  if (startDate) {
+    queryBuilder = queryBuilder.gte('openingDate', startDate.toISOString());
+  }
+
+  if (endDate) {
+    const endOfDay = new Date(endDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    queryBuilder = queryBuilder.lte('openingDate', endOfDay.toISOString());
+  }
+
+  if (status && status !== "Todos") {
+    queryBuilder = queryBuilder.eq('status', status);
+  }
+
+  queryBuilder = queryBuilder.order('openingDate', { ascending: false });
+
+  const { data, error } = await queryBuilder;
+
+  if (error) {
+    console.error('Erro ao buscar ordens de serviço por data e status:', error);
+    throw new Error('Erro ao gerar relatório de ordens de serviço');
+  }
+
+  return (data as any[]).map(order => ({
+    ...order,
+    openingDate: new Date(order.openingDate),
+    updatedAt: order.updatedAt ? new Date(order.updatedAt) : undefined,
+  }));
+};
+
+// 2. Contar OSs por status específico
+export const getServiceOrdersCountByStatus = async (status: ServiceOrderStatus): Promise<number> => {
+  const { count, error } = await supabase
+    .from(SERVICE_ORDERS_TABLE)
+    .select('*', { count: 'exact', head: true })
+    .eq('status', status);
+
+  if (error) {
+    console.error('Erro ao contar ordens de serviço por status:', error);
+    throw new Error('Erro ao contar ordens de serviço');
+  }
+
+  return count ?? 0;
+};
+
+// 3. Somar valor total das OSs concluídas ou entregues
+export const getTotalCompletedServiceOrdersRevenue = async (): Promise<number> => {
+  const { data, error } = await supabase
+    .from(SERVICE_ORDERS_TABLE)
+    .select('grandTotalValue')
+    .in('status', ['Concluída', 'Entregue']);
+
+  if (error) {
+    console.error('Erro ao calcular receita de ordens concluídas:', error);
+    throw new Error('Erro ao calcular receita');
+  }
+
+  return (data as any[]).reduce((sum, order) => sum + (order.grandTotalValue || 0), 0);
+};

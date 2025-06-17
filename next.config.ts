@@ -1,6 +1,8 @@
+import path from 'path';
 import type { NextConfig } from 'next';
 
-const nextConfig: NextConfig = {
+/** @type {NextConfig} */
+const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -28,6 +30,11 @@ const nextConfig: NextConfig = {
         pathname: '/storage/v1/object/public/**',
       },
     ],
+  },
+  webpack: (config) => {
+    // Habilita o alias "@/"
+    config.resolve.alias['@'] = path.resolve(__dirname, 'src');
+    return config;
   },
 };
 
