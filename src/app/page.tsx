@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,21 +10,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import Image from 'next/image';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-<<<<<<< HEAD
-import { AlertTriangle } from "lucide-react";
-import { UserForm } from '@/components/users/user-form';
-import { addUser } from '@/services/userService';
-import { getEstablishmentSettings } from '@/services/settingService';
-import type { User, UserRole } from '@/lib/schemas/user';
-import { useToast } from '@/hooks/use-toast';
-import { useMutation } from '@tanstack/react-query';
-
-type UserDataToSave = Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'password' | 'confirmPassword'>;
-
-interface MockStoredUser extends UserDataToSave {
-  password?: string;
-}
-=======
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { UserForm } from '@/components/users/user-form';
 import { addUser, getUserById } from '@/services/userService';
@@ -32,7 +18,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation } from '@tanstack/react-query';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
->>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -40,47 +25,12 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
-<<<<<<< HEAD
-  const { toast } = useToast();
-
-  // Estado da logo
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchLogo = async () => {
-      try {
-        const settings = await getEstablishmentSettings();
-        setLogoUrl(settings?.logoUrl || null);
-      } catch (error) {
-        console.error("Erro ao buscar logo:", error);
-      }
-    };
-    fetchLogo();
-  }, []);
-=======
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const { toast } = useToast();
->>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-<<<<<<< HEAD
-
-    if (email === 'teste@donphone.com' && password === 'Bettina03*') {
-      login('admin');
-    } else {
-      const storedMockUsersString = localStorage.getItem('mock_users');
-      const mockUsers: MockStoredUser[] = storedMockUsersString ? JSON.parse(storedMockUsersString) : [];
-
-      const matchedUser = mockUsers.find(u => u.email === email && u.password === password);
-
-      if (matchedUser) {
-        login(matchedUser.role as 'admin' | 'user' || 'user');
-      } else {
-        setError('Credenciais inválidas. Por favor, tente novamente.');
-      }
-=======
     setIsLoggingIn(true);
 
     try {
@@ -107,33 +57,10 @@ export default function LoginPage() {
       }
     } finally {
       setIsLoggingIn(false);
->>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
     }
   };
 
   const addUserMutation = useMutation({
-<<<<<<< HEAD
-    mutationFn: (userData: { firestoreData: UserDataToSave, formData: User }) => addUser(userData.firestoreData),
-    onSuccess: (docId, variables) => {
-      const { firestoreData, formData } = variables;
-      toast({
-        title: "Cadastro Realizado!",
-        description: "Seu usuário foi criado com sucesso. Agora você pode fazer login.",
-        variant: "default"
-      });
-
-      const storedMockUsersString = localStorage.getItem('mock_users');
-      const mockUsers: MockStoredUser[] = storedMockUsersString ? JSON.parse(storedMockUsersString) : [];
-
-      mockUsers.push({
-        email: firestoreData.email,
-        password: formData.password,
-        name: firestoreData.name,
-        role: firestoreData.role
-      });
-      localStorage.setItem('mock_users', JSON.stringify(mockUsers));
-
-=======
     mutationFn: (formData: CreateUserFormData | User) => addUser(formData as User),
     onSuccess: async (uid, formData) => {
       toast({
@@ -141,7 +68,6 @@ export default function LoginPage() {
         description: "Seu usuário foi criado com sucesso. Por favor, faça login.",
         variant: "default"
       });
->>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
       setIsRegisterDialogOpen(false);
     },
     onError: (error: Error) => {
@@ -153,47 +79,28 @@ export default function LoginPage() {
     },
   });
 
-<<<<<<< HEAD
-  const handleRegisterUser = async (formData: User) => {
-    const { id, createdAt, updatedAt, password, confirmPassword, ...userDataToSave } = formData;
-    const firestoreData: UserDataToSave = { ...userDataToSave, role: formData.role || 'user' };
-    await addUserMutation.mutateAsync({ firestoreData, formData });
-  };
-
-=======
   const handleRegisterUser = async (formData: CreateUserFormData | User) => {
     await addUserMutation.mutateAsync(formData);
   };
 
 
->>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm shadow-xl border-border">
         <CardHeader className="items-center text-center">
-<<<<<<< HEAD
-          <div className="mb-4 flex justify-center">
+          <div className="mb-2">
             <Image
-              src={logoUrl || "/donphone-logo.png"}
-              alt="Logo do Estabelecimento"
-              width={160}
-              height={60}
-              className="rounded object-contain"
-=======
-          <div className="mb-4">
-            <Image
-              src="/donphone-login-visual.png" 
-              alt="DonPhone Visual"
-              width={240} 
-              height={240}
-              data-ai-hint="company brand illustration"
+              src="/logoprincipal.png" 
+              alt="DonPhone Logo Principal"
+              width={360} 
+              height={360}
+              data-ai-hint="company logo"
               className="mx-auto"
->>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
               priority
             />
           </div>
-          <CardTitle className="font-headline text-3xl text-foreground">Sistema DonPhone</CardTitle>
-          <CardDescription className="text-muted-foreground">Por favor, entre para continuar</CardDescription>
+          {/* <CardTitle className="font-headline text-3xl text-foreground">Sistema DonPhone</CardTitle> */}
+          <CardDescription className="text-muted-foreground pt-2">Por favor, entre para continuar</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -238,12 +145,8 @@ export default function LoginPage() {
               variant="link"
               type="button"
               onClick={() => setIsRegisterDialogOpen(true)}
-<<<<<<< HEAD
-              className="text-sm px-0"
-=======
               className="text-sm px-0 text-primary hover:text-primary/80"
               disabled={isLoggingIn || addUserMutation.isPending}
->>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
             >
               Cadastrar Novo Usuário
             </Button>
@@ -261,11 +164,7 @@ export default function LoginPage() {
           <DialogHeader>
             <DialogTitle>Cadastrar Novo Usuário</DialogTitle>
             <DialogDescription>
-<<<<<<< HEAD
-              Preencha seus dados para criar uma conta. Após o cadastro, faça login normalmente.
-=======
               Preencha seus dados para criar uma conta. Após o cadastro, você precisará fazer login.
->>>>>>> 7555a0d60242d9430cf4cedade4356d18cf23464
             </DialogDescription>
           </DialogHeader>
           <UserForm
